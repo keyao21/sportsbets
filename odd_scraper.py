@@ -7,7 +7,6 @@ from pprint import pprint
 from bs4 import BeautifulSoup
 import pandas as pd
 
-
 def get_tablegames(str_lookback_date):
 	URL = f"https://www.sportsbookreview.com/betting-odds/nba-basketball/money-line/full-game/?date={str_lookback_date}"
 	page = requests.get(URL)
@@ -45,7 +44,6 @@ def parse_teams(tb):
 def parse_odds(tb): 
 	odds_regex = re.compile("OddsCells_pointer___xLMm OddsCells_margin__7d2oM.*")
 	tableodds = tb.find_all("span", {"class" : odds_regex})
-	tableodds
 	# should be mgm, dk, fd, caesars, pb, wynn, betrivers, maybe check this
 	books = ["MG", "DK", "FD", "CS", "PB", "WY", "BR"]
 	odds_by_book = {b:[None, None] for b in books}
@@ -85,6 +83,7 @@ def test():
 
 
 if __name__ == '__main__':
-	dt_range = pd.date_range(start=datetime.date(2018,1,1),end=datetime.date(2023,2,16) ).to_pydatetime().tolist()
-	for dt in dt_range: 
-		dt_datapkg = run_and_dump(dt)
+	# dt_range = pd.date_range(start=datetime.date(2018,1,1),end=datetime.date(2023,2,16) ).to_pydatetime().tolist()
+	# for dt in dt_range:
+	# 	dt_datapkg = run_and_dump(dt)
+	run_and_dump(datetime.date(2023, 2, 16))
