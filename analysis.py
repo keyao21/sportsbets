@@ -109,31 +109,54 @@ def add_arb_cols(games_data):
 
 
 def send_email(games_data, attachments): 
-    recipients = ["kyao747@gmail.com","sivaduil@gmail.com"] 
+    recipients = ["kyao747@gmail.com", "sivaduil@gmail.com"] 
     emaillist = [elem.strip().split(',') for elem in recipients]
     msg = MIMEMultipart()
     msg['From'] = 'helloitsmrbets@gmail.com'
     today_dt = datetime.date.today()
     today_dt_time = datetime.datetime(year=today_dt.year, month=today_dt.month, day=today_dt.day)
+
+    # show next/today's games 
     today_games_data = games_data[games_data.date>=today_dt_time]
-    html = f"""\
+    html0 = f"""\
             <html>
-              <head>Total prob inconsistencies in next/current game</head>
+              <head>Next/current game</head>
               <body>
-                {build_table(today_games_data,"blue_light")
-                    if len(today_games_data) > 0 else "None"
+                {build_table(
+                    select_cols(
+                        today_games_data
+                        .sort_values("arb_sig",ascending=False)
+                    ),
+                    "blue_light"
+                    ) if len(today_games_data) > 0 else "None"
                 }
               </body>
             </html>
             """
-    part1 = MIMEText(html, 'html')
+    part0 = MIMEText(html0, 'html')
+    msg.attach(part0)
+
+    # show games with signal
+    filt_games_data = select_cols(filter_games_data(games_data))
+    filt_today_games_data = filt_games_data[filt_games_data.date>=today_dt_time]
+    html1 = f"""\
+            <html>
+              <head>Total prob inconsistencies in next/current game</head>
+              <body>
+                {build_table(filt_today_games_data,"blue_light")
+                    if len(filt_today_games_data) > 0 else "None"
+                }
+              </body>
+            </html>
+            """
+    part1 = MIMEText(html1, 'html')
     msg.attach(part1)
 
     html2 = f"""\
             <html>
               <head>All total prob inconsistencies over past 30 days</head>
               <body>
-                {build_table(games_data,"blue_light")}
+                {build_table(filt_games_data,"blue_light")}
               </body>
             </html>
             """
@@ -170,17 +193,21 @@ def archive_df_as_csv(df, filename):
     return hist_data_loc
 
 
+def select_cols(games_data): 
+    return games_data\
+        [["arb_sig", "date", "home", "away", "game_part"]
+         + [f"book{l}{calcstr}" for calcstr in ["", "_cost", "_netpayout"] for l in ["h","a"]]
+         + ["h_rawio", "a_rawio", "return"]
+         + [b+l for l in ["h","a"] for b in config.BOOKS] 
+         + [b+l+"_rawio" for l in ["h","a"] for b in config.BOOKS]
+        ]
+
+
 def filter_games_data(games_data): 
     # filter dataframe in email body
     games_data = games_data\
         [games_data.arb_sig]\
         [games_data.date > datetime.datetime.today()-datetime.timedelta(days=30)]\
-        [["date", "home", "away", "game_part"]
-         + [f"book{l}{calcstr}" for calcstr in ["", "_cost", "_netpayout"] for l in ["h","a"]]
-         + ["h_rawio", "a_rawio", "return"]
-         + [b+l for l in ["h","a"] for b in config.BOOKS] 
-         + [b+l+"_rawio" for l in ["h","a"] for b in config.BOOKS]
-        ]\
         .sort_values("date",ascending=False)
     return games_data
 
@@ -190,10 +217,9 @@ if __name__ == '__main__':
     games_data = make_games_data()
     games_data = add_calc_cols(games_data)
     games_data = add_arb_cols(games_data)
-    filt_games_data = filter_games_data(games_data)
     hist_data_loc = archive_df_as_csv(games_data, filename=f"fullhistory_{run_dt.strftime('%Y%m%d')}.csv")
     send_email(
-        filt_games_data,
+        games_data,
         attachments={"hist_data_loc": hist_data_loc}
     )
     os.remove(hist_data_loc)
