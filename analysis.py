@@ -171,7 +171,7 @@ def send_email(games_data, attachments):
     msg.attach(attachment)
     
     # write subject 
-    msg['Subject'] = f"{len(today_games_data)} opportunities right now"
+    msg['Subject'] = f"{len(filt_today_games_data)} opportunities right now"
 
     try:
         """Checking for connection errors"""
