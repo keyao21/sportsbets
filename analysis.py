@@ -1,6 +1,7 @@
 import os 
 import itertools
 import pickle
+import argparse
 import datetime
 import numpy as np
 import pandas as pd
@@ -12,16 +13,25 @@ import odd_scraper
 import config
 
 
-def make_games_data():
+def load_hist_data(): 
     # get historical data
     data = [
         pickle.load(open(os.path.join(config.RESULTS_DIR,f), "rb")) 
         for f in os.listdir(config.RESULTS_DIR)
     ]
+    return data
+
+
+def load_current_data(): 
     # get data for next games
-    data.extend(
-        odd_scraper.run_current(gp) for gp in config.GamePart
-    )
+    data = [
+        odd_scraper.run_current(gp) 
+        for gp in config.GamePart
+    ]
+    return data
+
+
+def make_games_data(data):
     col_headers = \
         ["date", "game_part", "home", "away", "SCOREh", "SCOREa"] + \
         list(itertools.chain(*[[b+"h", b+"a"] for b in config.BOOKS]))
@@ -108,7 +118,7 @@ def add_arb_cols(games_data):
     return games_data
 
 
-def send_email(games_data, attachments): 
+def send_email(games_data, incl_hist, attachments): 
     recipients = ["kyao747@gmail.com", "sivaduil@gmail.com"] 
     emaillist = [elem.strip().split(',') for elem in recipients]
     msg = MIMEMultipart()
@@ -152,23 +162,23 @@ def send_email(games_data, attachments):
     part1 = MIMEText(html1, 'html')
     msg.attach(part1)
 
-    html2 = f"""\
-            <html>
-              <head>All total prob inconsistencies over past 30 days</head>
-              <body>
-                {build_table(filt_games_data,"blue_light")}
-              </body>
-            </html>
-            """
-    part2 = MIMEText(html2, 'html')
-    msg.attach(part2)
-
-    # add historical data as attachment
-    hist_data_loc = attachments["hist_data_loc"]
-    with open(hist_data_loc) as fp: 
-        attachment = MIMEText(fp.read(), _subtype="text")
-    attachment.add_header("Content-Disposition", "attachment", filename=hist_data_loc)
-    msg.attach(attachment)
+    if incl_hist: 
+        html2 = f"""\
+                <html>
+                  <head>All total prob inconsistencies over past 30 days</head>
+                  <body>
+                    {build_table(filt_games_data,"blue_light")}
+                  </body>
+                </html>
+                """
+        part2 = MIMEText(html2, 'html')
+        msg.attach(part2)
+        # add historical data as attachment
+        hist_data_loc = attachments["hist_data_loc"]
+        with open(hist_data_loc) as fp: 
+            attachment = MIMEText(fp.read(), _subtype="text")
+        attachment.add_header("Content-Disposition", "attachment", filename=hist_data_loc)
+        msg.attach(attachment)
     
     # write subject 
     msg['Subject'] = f"{len(filt_today_games_data)} opportunities right now"
@@ -214,12 +224,32 @@ def filter_games_data(games_data):
 
 if __name__ == '__main__':
     run_dt = datetime.date.today()
-    games_data = make_games_data()
+    parser = argparse.ArgumentParser()
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument('--simple', action='store_true')
+    group.add_argument('--hist', action='store_true')
+    args = parser.parse_args()
+
+    if args.simple: 
+        loaded_data = load_current_data()
+    elif args.hist: 
+        loaded_data = load_hist_data() + load_current_data()
+
+    games_data = make_games_data(loaded_data)
     games_data = add_calc_cols(games_data)
     games_data = add_arb_cols(games_data)
-    hist_data_loc = archive_df_as_csv(games_data, filename=f"fullhistory_{run_dt.strftime('%Y%m%d')}.csv")
-    send_email(
-        games_data,
-        attachments={"hist_data_loc": hist_data_loc}
-    )
-    os.remove(hist_data_loc)
+
+    if args.simple:
+        send_email(
+            games_data,
+            incl_hist=False,
+            attachments={}
+        ) 
+    elif args.hist:
+        hist_data_loc = archive_df_as_csv(games_data, filename=f"fullhistory_{run_dt.strftime('%Y%m%d')}.csv")
+        send_email(
+            games_data,
+            incl_hist=True,
+            attachments={"hist_data_loc": hist_data_loc}
+        )
+        os.remove(hist_data_loc)
