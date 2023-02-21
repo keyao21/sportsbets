@@ -125,7 +125,7 @@ def send_email(games_data, attachments):
                 {build_table(
                     select_cols(
                         today_games_data
-                        .sort_values("arb_sig",ascending=False)
+                        .sort_values(by=["arb_sig", "date", "home", "away", "game_part"],ascending=False)
                     ),
                     "blue_light"
                     ) if len(today_games_data) > 0 else "None"
