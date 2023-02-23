@@ -16,8 +16,8 @@ import config
 def load_hist_data(): 
     # get historical data
     data = [
-        pickle.load(open(os.path.join(config.RESULTS_DIR,f), "rb")) 
-        for f in os.listdir(config.RESULTS_DIR)
+        pickle.load(open(os.path.join(config.DATA_DIR,f), "rb")) 
+        for f in os.listdir(config.DATA_DIR)
     ]
     return data
 
@@ -197,6 +197,14 @@ def send_email(games_data, incl_hist, attachments):
         print("Error for connection: {}".format(e))
 
 
+def save_df_snapshot(df):
+    ts = datetime.datetime.now()
+    filename = f"snap_{ts.strftime('%Y%m%d%H%M%S')}.dat"
+    with open(os.path.join(config.SNAPS_DIR, filename), "wb") as f:
+        df['timestamp'] = ts
+        pickle.dump(df, f)
+
+
 def archive_df_as_csv(df, filename): 
     hist_data_loc =  os.path.join(config.ARCHIVE_DIR, filename)
     df.to_csv(hist_data_loc)
@@ -228,28 +236,44 @@ if __name__ == '__main__':
     group = parser.add_mutually_exclusive_group()
     group.add_argument('--simple', action='store_true')
     group.add_argument('--hist', action='store_true')
+    parser.add_argument('--email', action='store_true')
+    parser.add_argument('--check_email', action='store_true')
     args = parser.parse_args()
 
-    if args.simple: 
-        loaded_data = load_current_data()
-    elif args.hist: 
-        loaded_data = load_hist_data() + load_current_data()
-
-    games_data = make_games_data(loaded_data)
-    games_data = add_calc_cols(games_data)
-    games_data = add_arb_cols(games_data)
-
     if args.simple:
-        send_email(
-            games_data,
-            incl_hist=False,
-            attachments={}
-        ) 
+        # general run for current/next games.
+        loaded_data = load_current_data()
+        games_data = make_games_data(loaded_data)
+        games_data = add_calc_cols(games_data)
+        games_data = add_arb_cols(games_data)
+        save_df_snapshot(games_data)
+        if args.email: 
+            send_email(
+                games_data,
+                incl_hist=False,
+                attachments={}
+            )
+        elif args.check_email and (len(games[games.arb_sig])>0): 
+            send_email(
+                games_data,
+                incl_hist=False,
+                attachments={}
+            )
+
     elif args.hist:
-        hist_data_loc = archive_df_as_csv(games_data, filename=f"fullhistory_{run_dt.strftime('%Y%m%d')}.csv")
-        send_email(
-            games_data,
-            incl_hist=True,
-            attachments={"hist_data_loc": hist_data_loc}
-        )
-        os.remove(hist_data_loc)
+        # historical run with all past games and current/next games. 
+        loaded_data = load_hist_data() + load_current_data()
+        games_data = make_games_data(loaded_data)
+        games_data = add_calc_cols(games_data)
+        games_data = add_arb_cols(games_data)
+        if args.email:
+            hist_data_loc = archive_df_as_csv(
+                games_data, 
+                filename=f"fullhistory_{run_dt.strftime('%Y%m%d')}.csv"
+            )
+            send_email(
+                games_data,
+                incl_hist=True,
+                attachments={"hist_data_loc": hist_data_loc}
+            )
+            os.remove(hist_data_loc)

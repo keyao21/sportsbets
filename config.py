@@ -1,8 +1,9 @@
 from enum import Enum
 
 
-RESULTS_DIR = "data"
-ARCHIVE_DIR = "archive"
+DATA_DIR = "/home/yaokevin/projects/sportsbets/data"
+SNAPS_DIR = "/home/yaokevin/projects/sportsbets/snaps"
+ARCHIVE_DIR = "/home/yaokevin/projects/sportsbets/archive"
 BOOKS = ["MG", "DK", "FD", "CS", "PB", "WY", "BR"]
 
 
