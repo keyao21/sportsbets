@@ -105,9 +105,9 @@ def add_arb_cols(games_data):
     # add arb signal columns
     h_rawio_cols = [f"{b}h_rawio" for b in config.BOOKS]
     a_rawio_cols = [f"{b}a_rawio" for b in config.BOOKS]
-    games_data["arb_sig"] = games_data.apply(lambda row: min(row[h_rawio_cols])+min(row[a_rawio_cols]) < 1, axis=1)
-    games_data["booka"] = games_data.apply(lambda r: config.BOOKS[np.argmin(r[a_rawio_cols])] if r["arb_sig"] else None, axis=1)
-    games_data["bookh"] = games_data.apply(lambda r: config.BOOKS[np.argmin(r[h_rawio_cols])] if r["arb_sig"] else None, axis=1)
+    games_data["arb_sig"] = games_data.apply(lambda row: np.nanmin(row[h_rawio_cols])+np.nanmin(row[a_rawio_cols]) < 1, axis=1)
+    games_data["booka"] = games_data.apply(lambda r: config.BOOKS[np.nanargmin(r[a_rawio_cols])] if r["arb_sig"] else None, axis=1)
+    games_data["bookh"] = games_data.apply(lambda r: config.BOOKS[np.nanargmin(r[h_rawio_cols])] if r["arb_sig"] else None, axis=1)
     games_data["booka_cost"] = games_data["arb_sig"].apply(lambda x: 100 if x else 0)
     games_data["bookh_cost"] = games_data.apply(lambda r: calc_impl_cost(r, leg="h"), axis=1)
     games_data["booka_netpayout"] = games_data.apply(lambda r: calc_impl_netpayout(r,leg="a"), axis=1)
@@ -253,7 +253,7 @@ if __name__ == '__main__':
                 incl_hist=False,
                 attachments={}
             )
-        elif args.check_email and (len(games[games.arb_sig])>0): 
+        elif args.check_email and (len(games_data[games_data.arb_sig])>0): 
             send_email(
                 games_data,
                 incl_hist=False,
