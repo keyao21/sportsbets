@@ -1,6 +1,7 @@
 beautifulsoup4==4.11.2
-numpy==1.20.1
+nba_api==1.1.14
+numpy==1.24.2
 pandas==1.2.4
 pretty_html_table==0.9.16
 regex==2021.4.4
-requests==2.25.1
+requests==2.22.0

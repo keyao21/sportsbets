@@ -15,3 +15,4 @@ class GamePart(str, Enum):
     Q2 = "2nd-quarter"
     Q3 = "3rd-quarter"
     Q4 = "4th-quarter"
+
