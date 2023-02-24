@@ -73,18 +73,25 @@ def parse_date(soup):
 
 
 def run_and_dump(lookback_dt, game_part):
-    unique_filename = f"{game_part}{lookback_dt.strftime('%Y%m%d')}.dat"
-    str_lookback_date = lookback_dt.strftime("%Y-%m-%d")
     logging.info(f"running for {lookback_dt}, {game_part}")
+    unique_filename = f"{game_part.name}{lookback_dt.strftime('%Y%m%d')}.dat"
+    str_lookback_date = lookback_dt.strftime("%Y-%m-%d")
     tablegames = get_tablegames(str_lookback_date, game_part)
     if tablegames is None: # no games found 
         return
-    teams_by_game = [parse_teams(tb) for tb in tablegames]
-    results_by_game = [parse_results(tb) for tb in tablegames]
-    odds_by_game = [parse_odds(tb) for tb in tablegames]
-    data_pkg = [lookback_dt, game_part.name, teams_by_game, results_by_game, odds_by_game]
+    teams = [parse_teams(tb) for tb in tablegames]
+    score = [parse_results(tb) for tb in tablegames]
+    odds_by_book = [parse_odds(tb) for tb in tablegames]
+    data_pkg = {
+        "timestamp": None,
+        "date": dt,
+        "game_part": game_part.name,
+        "teams": teams,
+        "score": score,
+        "odds_by_book": odds_by_book
+    }
     logging.info(pformat(data_pkg))
-    with open(os.path.join(config.RESULTS_DIR, unique_filename), "wb") as f: 
+    with open(os.path.join(config.HIST_DIR, unique_filename), "wb") as f: 
         pickle.dump(data_pkg, f)
     time.sleep(1)
     return data_pkg
@@ -92,17 +99,27 @@ def run_and_dump(lookback_dt, game_part):
 
 def run_current(game_part): 
     logging.info(f"running current, {game_part}")
+    ts = datetime.datetime.now()
+    unique_filename = f"{game_part.name}{ts.strftime('%Y%m%d%H%M%S')}.dat"
     soup = get_soup(None, game_part)
     dt = parse_date(soup)
-    logging.info(f"date: {dt}")
     tablegames = get_tablegames(None, game_part)
     if tablegames is None: # no games found 
         return
-    teams_by_game = [parse_teams(tb) for tb in tablegames]
-    results_by_game = [parse_results(tb) for tb in tablegames]
-    odds_by_game = [parse_odds(tb) for tb in tablegames]
-    data_pkg = [dt, game_part.name, teams_by_game, results_by_game, odds_by_game]
+    teams = [parse_teams(tb) for tb in tablegames]
+    score = [parse_results(tb) for tb in tablegames]
+    odds_by_book = [parse_odds(tb) for tb in tablegames]
+    data_pkg = {
+        "timestamp": ts,
+        "date": dt,
+        "game_part": game_part.name,
+        "teams": teams,
+        "score": score,
+        "odds_by_book": odds_by_book
+    }
     logging.info(pformat(data_pkg))
+    with open(os.path.join(config.DATA_DIR, unique_filename), "wb") as f: 
+        pickle.dump(data_pkg, f)
     return data_pkg
 
 

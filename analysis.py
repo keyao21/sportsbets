@@ -33,18 +33,20 @@ def load_current_data():
 
 def make_games_data(data):
     col_headers = \
-        ["date", "game_part", "home", "away", "SCOREh", "SCOREa"] + \
+        ["timestamp", "date", "game_part", "home", "away", "SCOREh", "SCOREa"] + \
         list(itertools.chain(*[[b+"h", b+"a"] for b in config.BOOKS]))
     all_rows = []
     for data_i in data:
-        dt, game_part, teams, results, odds = data_i
-        n_games = len(teams)
-        rows = [[dt, game_part] for _ in range(n_games)]
+        n_games = len(data_i["teams"])
+        rows = [
+            [data_i["timestamp"], data_i["date"], data_i["game_part"]] 
+            for _ in range(n_games)
+        ]
         for j in range(n_games): 
-            rows[j].extend(teams[j])
-            rows[j].extend(results[j])
+            rows[j].extend(data_i["teams"][j])
+            rows[j].extend(data_i["score"][j])
             for b in config.BOOKS: 
-                rows[j].extend(odds[j][b])
+                rows[j].extend(data_i["odds_by_book"][j][b])
         all_rows.extend(rows)
     games_data = pd.DataFrame(all_rows, columns=col_headers)
     return games_data
@@ -130,12 +132,12 @@ def send_email(games_data, incl_hist, attachments):
     today_games_data = games_data[games_data.date>=today_dt_time]
     html0 = f"""\
             <html>
-              <head>Next/current game</head>
+              <head>Next/current games</head>
               <body>
                 {build_table(
                     select_cols(
                         today_games_data
-                        .sort_values(by=["arb_sig", "date", "home", "away", "game_part"],ascending=False)
+                        .sort_values(by=["return", "arb_sig", "date", "home", "away", "game_part"],ascending=False)
                     ),
                     "blue_light"
                     ) if len(today_games_data) > 0 else "None"
@@ -148,20 +150,6 @@ def send_email(games_data, incl_hist, attachments):
 
     # show games with signal
     filt_games_data = select_cols(filter_games_data(games_data))
-    filt_today_games_data = filt_games_data[filt_games_data.date>=today_dt_time]
-    html1 = f"""\
-            <html>
-              <head>Total prob inconsistencies in next/current game</head>
-              <body>
-                {build_table(filt_today_games_data,"blue_light")
-                    if len(filt_today_games_data) > 0 else "None"
-                }
-              </body>
-            </html>
-            """
-    part1 = MIMEText(html1, 'html')
-    msg.attach(part1)
-
     if incl_hist: 
         html2 = f"""\
                 <html>
@@ -181,7 +169,7 @@ def send_email(games_data, incl_hist, attachments):
         msg.attach(attachment)
     
     # write subject 
-    msg['Subject'] = f"{len(filt_today_games_data)} opportunities right now"
+    msg['Subject'] = f"{len(today_games_data[today_games_data.arb_sig])} opportunities right now"
 
     try:
         """Checking for connection errors"""
@@ -213,9 +201,9 @@ def archive_df_as_csv(df, filename):
 
 def select_cols(games_data): 
     return games_data\
-        [["arb_sig", "date", "home", "away", "game_part"]
-         + [f"book{l}{calcstr}" for calcstr in ["", "_cost", "_netpayout"] for l in ["h","a"]]
+        [["arb_sig", "timestamp", "date", "home", "away", "game_part"]
          + ["h_rawio", "a_rawio", "return"]
+         + [f"book{l}{calcstr}" for calcstr in ["", "_cost", "_netpayout"] for l in ["h","a"]]
          + [b+l for l in ["h","a"] for b in config.BOOKS] 
          + [b+l+"_rawio" for l in ["h","a"] for b in config.BOOKS]
         ]

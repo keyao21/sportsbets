@@ -1,6 +1,6 @@
 from enum import Enum
 
-
+HIST_DIR = "/home/yaokevin/projects/sportsbets/hist"
 DATA_DIR = "/home/yaokevin/projects/sportsbets/data"
 SNAPS_DIR = "/home/yaokevin/projects/sportsbets/snaps"
 ARCHIVE_DIR = "/home/yaokevin/projects/sportsbets/archive"
