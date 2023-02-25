@@ -131,16 +131,17 @@ def add_live_stats_cols(games_data):
     score_boards = score_board_inst.get_dict()
     stats_data = [
         [
-            games["homeTeam"]["teamTricode"],
             games["awayTeam"]["teamTricode"],
+            games["homeTeam"]["teamTricode"], # why is the away team flipped? is this a bug or am i dumb
             games["gameStatusText"],
-            games["gameStatus"]
+            games["gameStatus"],
+            games["period"]
         ] 
         for games in score_boards["scoreboard"]["games"]
     ]
     stats_data_df = pd.DataFrame(
         stats_data, 
-        columns=["home","away","statustxt","status"]
+        columns=["home","away","statustxt","status","period"]
     )
     today_dt = datetime.date.today()
     today_dt_time = datetime.datetime(year=today_dt.year, month=today_dt.month, day=today_dt.day)
@@ -161,12 +162,6 @@ def save_df_snapshot(df):
     with open(os.path.join(config.SNAPS_DIR, filename), "wb") as f:
         df['timestamp'] = ts
         pickle.dump(df, f)
-
-
-def archive_df_as_csv(df, filename): 
-    hist_data_loc =  os.path.join(config.ARCHIVE_DIR, filename)
-    df.to_csv(hist_data_loc)
-    return hist_data_loc
 
 
 if __name__ == '__main__':
@@ -190,14 +185,12 @@ if __name__ == '__main__':
         if args.email: 
             utils.send_email(
                 games_data,
-                incl_hist=False,
-                attachments={}
+                incl_hist=False
             )
         elif args.check_email and (len(games_data[games_data.arb_sig])>0): 
-            send_email(
+            utils.send_email(
                 games_data,
-                incl_hist=False,
-                attachments={}
+                incl_hist=False
             )
 
     elif args.hist:
@@ -208,13 +201,8 @@ if __name__ == '__main__':
         games_data = add_arb_cols(games_data)
         games_data = add_live_stats_cols(games_data)
         if args.email:
-            hist_data_loc = archive_df_as_csv(
-                games_data, 
-                filename=f"fullhistory_{run_dt.strftime('%Y%m%d')}.csv"
-            )
             utils.send_email(
                 games_data,
-                incl_hist=True,
-                attachments={"hist_data_loc": hist_data_loc}
+                incl_hist=True
             )
-            os.remove(hist_data_loc)
+            

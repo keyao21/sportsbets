@@ -1,3 +1,4 @@
+import os 
 import datetime
 from pretty_html_table import build_table
 from email.mime.text import MIMEText
@@ -75,7 +76,7 @@ SBR_TEAMS = {
 
 def select_cols(games_data): 
     return games_data\
-        [["arb_sig", "statustxt", "timestamp", "date", "home", "away", "game_part"]
+        [["arb_sig", "status", "period", "statustxt", "timestamp", "date", "home", "away", "game_part"]
          + ["h_rawio", "a_rawio", "return"]
          + [f"book{l}{calcstr}" for calcstr in ["", "_cost", "_netpayout"] for l in ["h","a"]]
          + [b+l for l in ["h","a"] for b in config.BOOKS] 
@@ -92,25 +93,46 @@ def filter_games_data(games_data):
     return games_data
 
 
-def send_email(games_data, incl_hist, attachments): 
+def add_attachment(msg, games_data, filename): 
+    archive_loc = os.path.join(config.ARCHIVE_DIR, filename)
+    games_data.to_csv(archive_loc)
+    with open(archive_loc) as fp: 
+        attachment = MIMEText(fp.read(), _subtype="text")
+    attachment.add_header("Content-Disposition", "attachment", filename=archive_loc)
+    msg.attach(attachment)
+    os.remove(archive_loc)
+    return msg
+
+
+def send_email(games_data, incl_hist):
     recipients = ["kyao747@gmail.com", "sivaduil@gmail.com"] 
     emaillist = [elem.strip().split(',') for elem in recipients]
     msg = MIMEMultipart()
     msg['From'] = 'helloitsmrbets@gmail.com'
     today_dt = datetime.date.today()
     today_dt_time = datetime.datetime(year=today_dt.year, month=today_dt.month, day=today_dt.day)
-
     # show current opps 
+    game_part_order = {
+        "HALF1" : 3,
+        "Q1"    : 2,
+        "Q2"    : 3,
+        "Q3"    : 4,
+        "Q4"    : float("inf"),
+        "HALF2" : float("inf"),
+        "FULL"  : float("inf")
+    }
     curropps_games_data = games_data\
         [games_data.date>=today_dt_time]\
         [games_data.arb_sig]\
-        [games_data.status != 3]
+        [games_data.status != 3]\
+        [games_data.game_part.map(game_part_order) >= games_data.period]
+
     html0 = f"""\
             <html>
               <body>
                 {build_table(
                     select_cols(
-                        curr_games_data
+                        curropps_games_data
                         .sort_values(by=["return", "arb_sig", "date", "home", "away", "game_part"],ascending=False)
                     ),
                     "blue_light"
@@ -141,6 +163,7 @@ def send_email(games_data, incl_hist, attachments):
             """
     part1 = MIMEText(html1, 'html')
     msg.attach(part1)
+    msg = add_attachment(msg, today_games_data, filename=f"today_{today_dt.strftime('%Y%m%d')}.csv")
 
     # show games with signal
     filt_games_data = select_cols(filter_games_data(games_data))
@@ -155,15 +178,10 @@ def send_email(games_data, incl_hist, attachments):
                 """
         part2 = MIMEText(html2, 'html')
         msg.attach(part2)
-        # add historical data as attachment
-        hist_data_loc = attachments["hist_data_loc"]
-        with open(hist_data_loc) as fp: 
-            attachment = MIMEText(fp.read(), _subtype="text")
-        attachment.add_header("Content-Disposition", "attachment", filename=hist_data_loc)
-        msg.attach(attachment)
-    
+        msg = add_attachment(msg, filt_games_data, filename=f"hist_{today_dt.strftime('%Y%m%d')}.csv")
+
     # write subject 
-    msg['Subject'] = f"{len(curropps_games_data)} opportunities right now"
+    msg['Subject'] = f"{len(curropps_games_data)} arbs right now"
 
     try:
         """Checking for connection errors"""
