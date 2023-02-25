@@ -125,7 +125,7 @@ def send_email(games_data, incl_hist):
         [games_data.date>=today_dt_time]\
         [games_data.arb_sig]\
         [games_data.status != 3]\
-        [games_data.game_part.map(game_part_order) >= games_data.period]
+        [~games_data.period.isnull() & (games_data.game_part.map(game_part_order) >= games_data.period)]
 
     html0 = f"""\
             <html>
