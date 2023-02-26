@@ -1,5 +1,6 @@
 import os 
 import itertools
+import functools
 import pickle
 import argparse
 import datetime
@@ -16,6 +17,15 @@ def load_hist_data():
     data = [
         pickle.load(open(os.path.join(config.HIST_DIR,f), "rb")) 
         for f in os.listdir(config.HIST_DIR)
+    ]
+    return data
+
+
+def load_snap_data(): 
+    # get snap daily data
+    data = [
+        pickle.load(open(os.path.join(config.SNAPS_DIR,f), "rb")) 
+        for f in os.listdir(config.SNAPS_DIR)
     ]
     return data
 
@@ -146,6 +156,9 @@ def add_live_stats_cols(games_data):
         stats_data, 
         columns=["home","away","statustxt","status","period"]
     )
+    # (hacky?) way to adjust end periods and remove end of quarters and finals when theyre no longer valid for the bet
+    snapgames_data["period_adj"] = snapgames_data["period"] \
+        + (snapgames_data["statustxt"].str.contains("End") | snapgames_data["period"]==3).astype(int)
     today_dt = datetime.date.today()
     today_dt_time = datetime.datetime(year=today_dt.year, month=today_dt.month, day=today_dt.day)
     stats_data_df["date"] = today_dt_time
@@ -167,12 +180,55 @@ def save_df_snapshot(df):
         pickle.dump(df, f)
 
 
+def make_snaps_data(data): 
+    return functools.reduce(
+        lambda d1,d2: pd.concat([d1,d2], ignore_index=True), 
+        data
+    )
+
+
+def make_data_by_uniq_arb(snaps_data): 
+    # get only usable return periods
+    fsnaps_data = snaps_data\
+        [snaps_data.period > 0]\
+        [(snaps_data.game_part.map(config.game_part_order) > snaps_data.period)]
+    # agg by unique bet arbs
+    fsnaps_data["return_dummy"] = fsnaps_data["return"]
+    fsnapsdata_byarb = fsnaps_data\
+        [~fsnaps_data["return"].isnull()]\
+        .groupby(["return_dummy","date","game_part","home","away","bookh","booka"])\
+        .agg(
+            arb_return=('return', lambda x: x.sum()/len(x)),
+            n_timestamps=('return', len),
+            duration_in_min=('timestamp', lambda x: (max(x)-min(x)).total_seconds()/60)
+        )
+    return fsnapsdata_byarb
+
+
+def make_return_stats(fsnapsdata_byarb, group_by=["date","game_part"]):
+    # agg by game_part
+    fsnapsdata_byarb["returnxdur"] = fsnapsdata_byarb["arb_return"] * fsnapsdata_byarb["duration_in_min"]
+    fsnapsdata_byarb_agg = \
+            fsnapsdata_byarb.groupby(group_by)\
+                .agg(
+                    n_samples=('arb_return', len),
+                    avg_return=('arb_return', lambda x: x.sum()/len(x)),
+                    sum_returnxdur=('returnxdur', lambda x: x.sum()/len(x)),
+                    tot_dur=('duration_in_min', sum),
+                    avg_dur=('duration_in_min', lambda x: x.sum()/len(x))
+            )
+    fsnapsdata_byarb_agg["wavg_return"] = fsnapsdata_byarb_agg["sum_returnxdur"] / fsnapsdata_byarb_agg["tot_dur"]
+    fsnapsdata_byarb_agg = fsnapsdata_byarb_agg.sort_values(["wavg_return"], ascending=False)
+    return fsnapsdata_byarb_agg
+
+
 if __name__ == '__main__':
     run_dt = datetime.date.today()
     parser = argparse.ArgumentParser()
     group = parser.add_mutually_exclusive_group()
     group.add_argument('--simple', action='store_true')
     group.add_argument('--hist', action='store_true')
+    group.add_argument('--stats', action='store_true')
     parser.add_argument('--email', action='store_true')
     parser.add_argument('--check_email', action='store_true')
     args = parser.parse_args()
@@ -208,4 +264,21 @@ if __name__ == '__main__':
                 games_data,
                 incl_hist=True
             )
-            
+
+    elif args.stats: 
+        # run stats
+        loaded_data = load_snap_data()
+        snaps_data = make_snaps_data(loaded_data)
+        fsnapsdata_byarb = make_data_by_uniq_arb(snaps_data)
+        fsnapsdata_byarb_agg_dt = make_return_stats(fsnapsdata_byarb, group_by=["date"]).sort_values("date")
+        fsnapsdata_byarb_agg_gp = make_return_stats(fsnapsdata_byarb, group_by=["game_part"])
+        fsnapsdata_byarb_agg = make_return_stats(fsnapsdata_byarb, group_by=["date","game_part"])
+        if args.email:
+            utils.send_stat_email(
+                {
+                    "By date": fsnapsdata_byarb_agg_dt,
+                    "By game part": fsnapsdata_byarb_agg_gp,
+                    "By date, game part": fsnapsdata_byarb_agg
+                }
+            )
+        

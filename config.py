@@ -16,3 +16,13 @@ class GamePart(str, Enum):
     Q3 = "3rd-quarter"
     Q4 = "4th-quarter"
 
+
+game_part_order = {
+    "HALF1" : 3,
+    "Q1"    : 2,
+    "Q2"    : 3,
+    "Q3"    : 4,
+    "Q4"    : float("inf"),
+    "HALF2" : float("inf"),
+    "FULL"  : float("inf")
+}

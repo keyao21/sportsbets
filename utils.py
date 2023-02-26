@@ -112,20 +112,11 @@ def send_email(games_data, incl_hist):
     today_dt = datetime.date.today()
     today_dt_time = datetime.datetime(year=today_dt.year, month=today_dt.month, day=today_dt.day)
     # show current opps 
-    game_part_order = {
-        "HALF1" : 3,
-        "Q1"    : 2,
-        "Q2"    : 3,
-        "Q3"    : 4,
-        "Q4"    : float("inf"),
-        "HALF2" : float("inf"),
-        "FULL"  : float("inf")
-    }
     curropps_games_data = games_data\
         [games_data.date>=today_dt_time]\
         [games_data.arb_sig]\
         [games_data.status != 3]\
-        [~games_data.period.isnull() & (games_data.game_part.map(game_part_order) >= games_data.period)]
+        [~games_data.period.isnull() & (games_data.game_part.map(config.game_part_order) > games_data.period_adj)]
 
     html0 = f"""\
             <html>
@@ -182,6 +173,53 @@ def send_email(games_data, incl_hist):
 
     # write subject 
     msg['Subject'] = f"{len(curropps_games_data)} arbs right now"
+
+    try:
+        """Checking for connection errors"""
+        server = smtplib.SMTP('smtp.gmail.com', 587)
+        server.ehlo()#NOT NECESSARY
+        server.starttls()
+        server.ehlo()#NOT NECESSARY
+        server.login('helloitsmrbets@gmail.com',"efutywmvxjzhkojp")
+        server.sendmail(msg['From'], emaillist , msg.as_string())
+        server.close()
+
+    except Exception as e:
+        print("Error for connection: {}".format(e))
+
+
+def send_stat_email(stats_data):
+    recipients = ["kyao747@gmail.com","sivaduil@gmail.com"] 
+    emaillist = [elem.strip().split(',') for elem in recipients]
+    msg = MIMEMultipart()
+    msg['From'] = 'helloitsmrbets@gmail.com'
+    today_dt = datetime.date.today()
+    today_dt_time = datetime.datetime(year=today_dt.year, month=today_dt.month, day=today_dt.day)
+    
+    def add_table(msg, name, table): 
+        # show next/today's games 
+        html1 = f"""\
+                <html>
+                  <head>{name}</head>
+                  <body>
+                    {build_table(
+                        table.reset_index(),
+                        "blue_light"
+                        ) if len(table) > 0 else "None"
+                    }
+                  </body>
+                </html>
+                """
+        part1 = MIMEText(html1, 'html')
+        msg.attach(part1)
+        msg = add_attachment(msg, table, filename=f"{name}stats_{today_dt.strftime('%Y%m%d')}.csv")
+        return msg
+
+    for name,table in stats_data.items(): 
+        msg = add_table(msg, name, table)
+
+    # write subject 
+    msg['Subject'] = f"whats up dummy here are ur stats"
 
     try:
         """Checking for connection errors"""
