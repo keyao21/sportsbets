@@ -189,8 +189,10 @@ def make_snaps_data(data):
 
 def make_data_by_uniq_arb(snaps_data): 
     # get only usable return periods
+    # filter out unusable bookies like PB.
     fsnaps_data = snaps_data\
-        [snaps_data.period > 0]\
+        [snaps_data.booka != "PB"]\
+        [snaps_data.bookh != "PB"]\
         [(snaps_data.game_part.map(config.game_part_order) > snaps_data.period)]
     # agg by unique bet arbs
     fsnaps_data["return_dummy"] = fsnaps_data["return"]
@@ -214,10 +216,10 @@ def make_return_stats(fsnapsdata_byarb, group_by=["date","game_part"]):
                     n_samples=('arb_return', len),
                     avg_return=('arb_return', lambda x: x.sum()/len(x)),
                     sum_returnxdur=('returnxdur', sum),
-                    tot_dur=('duration_in_min', sum),
+                    sum_dur=('duration_in_min', sum),
                     avg_dur=('duration_in_min', lambda x: x.sum()/len(x))
             )
-    fsnapsdata_byarb_agg["wavg_return"] = fsnapsdata_byarb_agg["sum_returnxdur"] / fsnapsdata_byarb_agg["tot_dur"]
+    fsnapsdata_byarb_agg["wavg_return"] = fsnapsdata_byarb_agg["sum_returnxdur"] / fsnapsdata_byarb_agg["sum_dur"]
     fsnapsdata_byarb_agg = fsnapsdata_byarb_agg.sort_values(["wavg_return"], ascending=False)
     return fsnapsdata_byarb_agg
 
@@ -272,13 +274,15 @@ if __name__ == '__main__':
         fsnapsdata_byarb = make_data_by_uniq_arb(snaps_data)
         fsnapsdata_byarb_agg_dt = make_return_stats(fsnapsdata_byarb, group_by=["date"]).sort_values("date")
         fsnapsdata_byarb_agg_gp = make_return_stats(fsnapsdata_byarb, group_by=["game_part"])
+        fsnapsdata_byarb_agg_bk = make_return_stats(fsnapsdata_byarb, group_by=["bookh","booka","game_part"])
         fsnapsdata_byarb_agg = make_return_stats(fsnapsdata_byarb, group_by=["date","game_part"])
         if args.email:
             utils.send_stat_email(
                 {
-                    "By date": fsnapsdata_byarb_agg_dt,
-                    "By game part": fsnapsdata_byarb_agg_gp,
-                    "By date, game part": fsnapsdata_byarb_agg
+                    "By date"           : fsnapsdata_byarb_agg_dt,
+                    "By game part"      : fsnapsdata_byarb_agg_gp,
+                    "By date, game part": fsnapsdata_byarb_agg,
+                    "By bookies"        : fsnapsdata_byarb_agg_bk
                 }
             )
         
