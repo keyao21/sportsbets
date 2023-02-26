@@ -41,7 +41,10 @@ def make_games_data(data):
             for _ in range(n_games)
         ]
         for j in range(n_games):
-            short_teams = [utils.SBR_TEAMS[t] for t in data_i["teams"][j]]
+            short_teams = [
+                t if t not in utils.SBR_TEAMS else utils.SBR_TEAMS[t] 
+                for t in data_i["teams"][j]
+            ]
             rows[j].extend(short_teams)
             rows[j].extend(data_i["score"][j])
             for b in config.BOOKS: 
