@@ -213,7 +213,7 @@ def make_return_stats(fsnapsdata_byarb, group_by=["date","game_part"]):
                 .agg(
                     n_samples=('arb_return', len),
                     avg_return=('arb_return', lambda x: x.sum()/len(x)),
-                    sum_returnxdur=('returnxdur', lambda x: x.sum()/len(x)),
+                    sum_returnxdur=('returnxdur', sum),
                     tot_dur=('duration_in_min', sum),
                     avg_dur=('duration_in_min', lambda x: x.sum()/len(x))
             )
