@@ -157,8 +157,8 @@ def add_live_stats_cols(games_data):
         columns=["home","away","statustxt","status","period"]
     )
     # (hacky?) way to adjust end periods and remove end of quarters and finals when theyre no longer valid for the bet
-    snapgames_data["period_adj"] = snapgames_data["period"] \
-        + (snapgames_data["statustxt"].str.contains("End") | snapgames_data["period"]==3).astype(int)
+    stats_data_df["period_adj"] = stats_data_df["period"] \
+        + (stats_data_df["statustxt"].str.contains("End") | stats_data_df["period"]==3).astype(int)
     today_dt = datetime.date.today()
     today_dt_time = datetime.datetime(year=today_dt.year, month=today_dt.month, day=today_dt.day)
     stats_data_df["date"] = today_dt_time
