@@ -3,8 +3,11 @@
 ## Runbook
 
 ### Arb Screen
-    - 8am - 7pm, hourly
-    - 7pm - 12am, every 10 min 
+    - Weekdays
+        - 8am - 7pm, hourly
+        - 7pm - 12am, every 10 min
+    - Weekends
+        - 11am - 12am, every 10 min  
     - Scrapes for current/next games from odds website
     - Create and save snap dataframe after enrichment
 ### Stats
