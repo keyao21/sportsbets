@@ -76,7 +76,7 @@ SBR_TEAMS = {
 
 def select_cols(games_data): 
     return games_data\
-        [["arb_sig", "status", "period", "statustxt", "timestamp", "date", "home", "away", "game_part"]
+        [["arb_sig", "statustxt", "game_part", "timestamp", "date", "home", "away"]
          + ["h_rawio", "a_rawio", "return"]
          + [f"book{l}{calcstr}" for calcstr in ["", "_cost", "_netpayout"] for l in ["h","a"]]
          + [b+l for l in ["h","a"] for b in config.BOOKS] 
@@ -116,7 +116,8 @@ def send_email(games_data, incl_hist):
         [games_data.date>=today_dt_time]\
         [games_data.arb_sig]\
         [games_data.status != 3]\
-        [~games_data.period.isnull() & (games_data.game_part.map(config.game_part_order) > games_data.period_adj)]
+        [(games_data.game_part.map(config.game_part_order) > games_data.period_adj)]
+        # [~games_data.period.isnull() & 
 
     html0 = f"""\
             <html>
@@ -137,24 +138,25 @@ def send_email(games_data, incl_hist):
 
     # show next/today's games 
     today_games_data = games_data[games_data.date>=today_dt_time]
+    today_games_data_select = select_cols(
+        today_games_data
+        .sort_values(by=["status", "return", "arb_sig", "date", "home", "away", "game_part"],ascending=False)
+    )
     html1 = f"""\
             <html>
               <head>Next/current games</head>
               <body>
                 {build_table(
-                    select_cols(
-                        today_games_data
-                        .sort_values(by=["status", "return", "arb_sig", "date", "home", "away", "game_part"],ascending=False)
-                    ),
+                    today_games_data_select,
                     "blue_light"
-                    ) if len(today_games_data) > 0 else "None"
+                    ) if len(today_games_data_select) > 0 else "None"
                 }
               </body>
             </html>
             """
     part1 = MIMEText(html1, 'html')
     msg.attach(part1)
-    msg = add_attachment(msg, today_games_data, filename=f"today_{today_dt.strftime('%Y%m%d')}.csv")
+    msg = add_attachment(msg, today_games_data_select, filename=f"today_{today_dt.strftime('%Y%m%d')}.csv")
 
     # show games with signal
     filt_games_data = select_cols(filter_games_data(games_data))

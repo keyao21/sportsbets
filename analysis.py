@@ -187,22 +187,28 @@ def make_snaps_data(data):
     )
 
 
-def make_data_by_uniq_arb(snaps_data): 
+def filter_snaps_data(snaps_data): 
     # get only usable return periods
     # filter out unusable bookies like PB.
     fsnaps_data = snaps_data\
         [snaps_data.booka != "PB"]\
         [snaps_data.bookh != "PB"]\
         [(snaps_data.game_part.map(config.game_part_order) > snaps_data.period)]
+    return fsnaps_data
+
+
+def make_data_by_uniq_arb(snaps_data): 
     # agg by unique bet arbs
-    fsnaps_data["return_dummy"] = fsnaps_data["return"]
-    fsnapsdata_byarb = fsnaps_data\
-        [~fsnaps_data["return"].isnull()]\
+    snaps_data["return_dummy"] = snaps_data["return"]
+    fsnapsdata_byarb = snaps_data\
+        [~snaps_data["return"].isnull()]\
         .groupby(["return_dummy","date","game_part","home","away","bookh","booka"])\
         .agg(
             arb_return=('return', lambda x: x.sum()/len(x)),
             n_timestamps=('return', len),
-            duration_in_min=('timestamp', lambda x: (max(x)-min(x)).total_seconds()/60)
+            duration_in_min=('timestamp', lambda x: 
+                10 if len(x) == 1 
+                else (max(x)-min(x)).total_seconds()/60 )
         )
     return fsnapsdata_byarb
 
@@ -271,6 +277,7 @@ if __name__ == '__main__':
         # run stats
         loaded_data = load_snap_data()
         snaps_data = make_snaps_data(loaded_data)
+        snaps_data = filter_snaps_data(snaps_data)
         fsnapsdata_byarb = make_data_by_uniq_arb(snaps_data)
         fsnapsdata_byarb_agg_dt = make_return_stats(fsnapsdata_byarb, group_by=["date"]).sort_values("date")
         fsnapsdata_byarb_agg_gp = make_return_stats(fsnapsdata_byarb, group_by=["game_part"])
