@@ -76,11 +76,11 @@ SBR_TEAMS = {
 
 def select_cols(games_data): 
     return games_data\
-        [["arb_sig", "statustxt", "game_part", "timestamp", "date", "home", "away"]
-         + ["h_rawio", "a_rawio", "return"]
-         + [f"book{l}{calcstr}" for calcstr in ["", "_cost", "_netpayout"] for l in ["h","a"]]
-         + [b+l for l in ["h","a"] for b in config.BOOKS] 
-         + [b+l+"_rawio" for l in ["h","a"] for b in config.BOOKS]
+        [["arb_sig", "statustxt", "game_part", "home", "away"]
+         + [f"book{l}{calcstr}" for calcstr in ["", "_cost"] for l in ["h","a"]]
+         + ["return", "h_rawio", "a_rawio"]
+         + [f"book{l}_netpayout" for l in ["h","a"]]
+         + [b+l for l in ["h","a"] for b in config.BOOKS]
         ]
 
 
@@ -112,15 +112,20 @@ def send_email(games_data, incl_hist):
     today_dt = datetime.date.today()
     today_dt_time = datetime.datetime(year=today_dt.year, month=today_dt.month, day=today_dt.day)
     # show current opps 
+    # exclude PB
     curropps_games_data = games_data\
         [games_data.date>=today_dt_time]\
         [games_data.arb_sig]\
         [games_data.status != 3]\
+        [games_data.booka != "PB"]\
+        [games_data.bookh != "PB"]\
         [(games_data.game_part.map(config.game_part_order) > games_data.period_adj)]
-        # [~games_data.period.isnull() & 
 
     html0 = f"""\
             <html>
+              <head>
+                Timestamp:{curropps_games_data["timestamp"].unique()[0]}
+              </head>
               <body>
                 {build_table(
                     select_cols(
