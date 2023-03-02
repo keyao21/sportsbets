@@ -17,7 +17,7 @@ class GamePart(str, Enum):
     Q4 = "4th-quarter"
 
 
-game_part_order = {
+game_part_order = { # maps to period where betting ends (exclusive)
     "HALF1" : 3,
     "Q1"    : 2,
     "Q2"    : 3,
@@ -25,4 +25,14 @@ game_part_order = {
     "Q4"    : float("inf"),
     "HALF2" : float("inf"),
     "FULL"  : float("inf")
+}
+
+game_part_start = { # maps to period where betting starts
+    "HALF1" : 1,
+    "Q1"    : 1,
+    "Q2"    : 2,
+    "Q3"    : 3,
+    "Q4"    : 4,
+    "HALF2" : 3,
+    "FULL"  : 1
 }

@@ -119,12 +119,22 @@ def send_email(games_data, incl_hist):
         [games_data.status != 3]\
         [games_data.booka != "PB"]\
         [games_data.bookh != "PB"]\
-        [(games_data.game_part.map(config.game_part_order) > games_data.period_adj)]
+        [(games_data.game_part.map(config.game_part_order) > games_data.period_adj)]\
+        [
+        # crazy stuff for excluding DK interquarter stuff when you cant bet.
+        # if the game has started, DK is a book, and the current quarter/half is not in the betting quarter half
+         ~(
+           (~games_data.period_adj.isnull()) 
+           & ((games_data.bookh=="DK") | (games_data.booka=="DK")) 
+           & (games_data.game_part.map(config.game_part_start)!=games_data.period_adj) 
+          )
+        ]
+
 
     html0 = f"""\
             <html>
               <head>
-                Timestamp:{curropps_games_data["timestamp"].unique()[0]}
+                Timestamp:{curropps_games_data["timestamp"].unique()}
               </head>
               <body>
                 {build_table(
@@ -177,6 +187,9 @@ def send_email(games_data, incl_hist):
         part2 = MIMEText(html2, 'html')
         msg.attach(part2)
         msg = add_attachment(msg, filt_games_data, filename=f"hist_{today_dt.strftime('%Y%m%d')}.csv")
+
+    end_html = MIMEText("<html><head>End of email goodbye</html></head>", 'html')
+    msg.attach(end_html)
 
     # write subject 
     msg['Subject'] = f"{len(curropps_games_data)} arbs right now"
