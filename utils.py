@@ -117,8 +117,7 @@ def send_email(games_data, incl_hist):
         [games_data.date>=today_dt_time]\
         [games_data.arb_sig]\
         [games_data.status != 3]\
-        [games_data.booka != "PB"]\
-        [games_data.bookh != "PB"]\
+        [(games_data.bookh=="PB") | (games_data.booka=="PB")]
         [(games_data.game_part.map(config.game_part_order) > games_data.period_adj)]\
         [
         # crazy stuff for excluding DK interquarter stuff when you cant bet.
@@ -129,7 +128,6 @@ def send_email(games_data, incl_hist):
            & (games_data.game_part.map(config.game_part_start)!=games_data.period_adj) 
           )
         ]
-
 
     html0 = f"""\
             <html>
@@ -153,16 +151,14 @@ def send_email(games_data, incl_hist):
 
     # show next/today's games 
     today_games_data = games_data[games_data.date>=today_dt_time]
-    today_games_data_select = select_cols(
-        today_games_data
+    today_games_data_select = today_games_data\
         .sort_values(by=["status", "return", "arb_sig", "date", "home", "away", "game_part"],ascending=False)
-    )
     html1 = f"""\
             <html>
               <head>Next/current games</head>
               <body>
                 {build_table(
-                    today_games_data_select,
+                    select_cols(today_games_data_select),
                     "blue_light"
                     ) if len(today_games_data_select) > 0 else "None"
                 }
