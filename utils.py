@@ -87,8 +87,8 @@ def select_cols(games_data):
 def filter_games_data(games_data): 
     # filter dataframe in email body
     games_data = games_data\
-        [games_data.arb_sig]\
-        [games_data.date > datetime.datetime.today()-datetime.timedelta(days=30)]\
+        .loc[games_data.arb_sig]\
+        .loc[games_data.date > datetime.datetime.today()-datetime.timedelta(days=30)]\
         .sort_values("date",ascending=False)
     return games_data
 
@@ -114,16 +114,20 @@ def send_email(games_data, incl_hist):
     # show current opps 
     # exclude PB
     curropps_games_data = games_data\
-        [games_data.date>=today_dt_time]\
-        [games_data.arb_sig]\
-        [games_data.status != 3]\
-        [(games_data.bookh=="PB") | (games_data.booka=="PB")]
-        [(games_data.game_part.map(config.game_part_order) > games_data.period_adj)]\
-        [
+        .loc[games_data.date>=today_dt_time]\
+        .loc[games_data.arb_sig]\
+        .loc[(games_data.game_part.map(config.game_part_order) > games_data.period_adj)]\
+        .loc[games_data.status != 3]\
+        .loc[~(
+            ((games_data.bookh.str.match("PB")) | (games_data.booka.str.match("PB"))) 
+            & ~games_data.game_part.str.match("FULL")
+            )
+        ]\
+        .loc[
         # crazy stuff for excluding DK interquarter stuff when you cant bet.
         # if the game has started, DK is a book, and the current quarter/half is not in the betting quarter half
          ~(
-           (~games_data.period_adj.isnull()) 
+           ~(games_data.period_adj==0 | games_data.period_adj.isnull()) 
            & ((games_data.bookh=="DK") | (games_data.booka=="DK")) 
            & (games_data.game_part.map(config.game_part_start)!=games_data.period_adj) 
           )
@@ -149,8 +153,8 @@ def send_email(games_data, incl_hist):
     part0 = MIMEText(html0, 'html')
     msg.attach(part0)
 
-    # show next/today's games 
-    today_games_data = games_data[games_data.date>=today_dt_time]
+    # show next/upcoming bets 
+    today_games_data = games_data.loc[games_data.date>=today_dt_time]
     today_games_data_select = today_games_data\
         .sort_values(by=["status", "return", "arb_sig", "date", "home", "away", "game_part"],ascending=False)
     html1 = f"""\
@@ -167,11 +171,11 @@ def send_email(games_data, incl_hist):
             """
     part1 = MIMEText(html1, 'html')
     msg.attach(part1)
-    msg = add_attachment(msg, today_games_data_select, filename=f"today_{today_dt.strftime('%Y%m%d')}.csv")
+    msg = add_attachment(msg, select_cols(today_games_data_select), filename=f"today_{today_dt.strftime('%Y%m%d')}.csv")
 
     # show games with signal
-    filt_games_data = select_cols(filter_games_data(games_data))
     if incl_hist: 
+        filt_games_data = select_cols(filter_games_data(games_data))
         html2 = f"""\
                 <html>
                   <head>All total prob inconsistencies over past 30 days</head>

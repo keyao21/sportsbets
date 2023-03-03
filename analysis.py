@@ -191,9 +191,9 @@ def filter_snaps_data(snaps_data):
     # get only usable return periods
     # filter out unusable bookies like PB.
     fsnaps_data = snaps_data\
-        [snaps_data.booka != "PB"]\
-        [snaps_data.bookh != "PB"]\
-        [(snaps_data.game_part.map(config.game_part_order) > snaps_data.period)]
+        .loc[snaps_data.booka != "PB"]\
+        .loc[snaps_data.bookh != "PB"]\
+        .loc[(snaps_data.game_part.map(config.game_part_order) > snaps_data.period)]
     return fsnaps_data
 
 

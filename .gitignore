@@ -4,3 +4,4 @@ data/*
 logs/*
 dataresults/*
 dataresults_dl/*
+notebooks/*.ipynb

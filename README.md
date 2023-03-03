@@ -1,4 +1,7 @@
 # Mr. Bets
+## Todo
+    - show every arb for each game, not just the one with the max return 
+    - pinnacle
 
 ## Runbook
 
