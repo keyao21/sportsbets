@@ -93,6 +93,35 @@ def filter_games_data(games_data):
     return games_data
 
 
+def filter_snaps_data(snaps_data): 
+    # get only usable return periods
+    # filter out unusable bookies like PB.
+    # fsnaps_data = snaps_data\
+    #     .loc[snaps_data.booka != "PB"]\
+    #     .loc[snaps_data.bookh != "PB"]\
+    #     .loc[(snaps_data.game_part.map(config.game_part_order) > snaps_data.period)]
+    games_data = snaps_data
+    fsnaps_data = games_data\
+        .loc[games_data.arb_sig]\
+        .loc[(games_data.game_part.map(config.game_part_order) >= games_data.period_adj)]\
+        .loc[games_data.status != 3]\
+        .loc[~(
+            ((games_data.bookh.str.match("PB")) | (games_data.booka.str.match("PB"))) 
+            & ~games_data.game_part.str.match("FULL")
+            )
+        ]\
+        .loc[
+        # crazy stuff for excluding DK interquarter stuff when you cant bet.
+        # if the game has started, DK is a book, and the current quarter/half is not in the betting quarter half
+         ~(
+           ~(games_data.period_adj==0 | games_data.period_adj.isnull()) 
+           & ((games_data.bookh=="DK") | (games_data.booka=="DK")) 
+           & (games_data.game_part.map(config.game_part_start) > games_data.period_adj) 
+          )
+        ]
+    return fsnaps_data
+
+
 def add_attachment(msg, games_data, filename): 
     archive_loc = os.path.join(config.ARCHIVE_DIR, filename)
     games_data.to_csv(archive_loc)
@@ -112,27 +141,8 @@ def send_email(games_data, incl_hist):
     today_dt = datetime.date.today()
     today_dt_time = datetime.datetime(year=today_dt.year, month=today_dt.month, day=today_dt.day)
     # show current opps 
-    # exclude PB
-    curropps_games_data = games_data\
-        .loc[games_data.date>=today_dt_time]\
-        .loc[games_data.arb_sig]\
-        .loc[(games_data.game_part.map(config.game_part_order) > games_data.period_adj)]\
-        .loc[games_data.status != 3]\
-        .loc[~(
-            ((games_data.bookh.str.match("PB")) | (games_data.booka.str.match("PB"))) 
-            & ~games_data.game_part.str.match("FULL")
-            )
-        ]\
-        .loc[
-        # crazy stuff for excluding DK interquarter stuff when you cant bet.
-        # if the game has started, DK is a book, and the current quarter/half is not in the betting quarter half
-         ~(
-           ~(games_data.period_adj==0 | games_data.period_adj.isnull()) 
-           & ((games_data.bookh=="DK") | (games_data.booka=="DK")) 
-           & (games_data.game_part.map(config.game_part_start)!=games_data.period_adj) 
-          )
-        ]
-
+    today_games_data = games_data.loc[games_data.date>=today_dt_time]
+    curropps_games_data = filter_snaps_data(today_games_data)
     html0 = f"""\
             <html>
               <head>
@@ -154,7 +164,6 @@ def send_email(games_data, incl_hist):
     msg.attach(part0)
 
     # show next/upcoming bets 
-    today_games_data = games_data.loc[games_data.date>=today_dt_time]
     today_games_data_select = today_games_data\
         .sort_values(by=["status", "return", "arb_sig", "date", "home", "away", "game_part"],ascending=False)
     html1 = f"""\
