@@ -1,6 +1,7 @@
 # Mr. Bets
 ## Todo
     - show every arb for each game, not just the one with the max return 
+    - other sports, ncaa, mlb
     - pinnacle
 
 ## Runbook

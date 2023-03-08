@@ -96,10 +96,6 @@ def filter_games_data(games_data):
 def filter_snaps_data(snaps_data): 
     # get only usable return periods
     # filter out unusable bookies like PB.
-    # fsnaps_data = snaps_data\
-    #     .loc[snaps_data.booka != "PB"]\
-    #     .loc[snaps_data.bookh != "PB"]\
-    #     .loc[(snaps_data.game_part.map(config.game_part_order) > snaps_data.period)]
     games_data = snaps_data
     fsnaps_data = games_data\
         .loc[games_data.arb_sig]\
