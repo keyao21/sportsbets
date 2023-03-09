@@ -99,7 +99,7 @@ def filter_snaps_data(snaps_data):
     games_data = snaps_data
     fsnaps_data = games_data\
         .loc[games_data.arb_sig]\
-        .loc[(games_data.game_part.map(config.game_part_order) >= games_data.period_adj)]\
+        .loc[(games_data.game_part.map(config.game_part_order) > games_data.period_adj)]\
         .loc[games_data.status != 3]\
         .loc[~(
             ((games_data.bookh.str.match("PB")) | (games_data.booka.str.match("PB"))) 

@@ -139,6 +139,53 @@ def add_arb_cols(games_data):
     return games_data
 
 
+def make_arb_data(games_data):
+    key_cols = ["timestamp", "date", "game_part", "home", "away", "SCOREh", "SCOREa"]
+    h_rawio_cols = [f"{b}h_rawio" for b in config.BOOKS]
+    a_rawio_cols = [f"{b}a_rawio" for b in config.BOOKS]
+    odds_cols = [b+l for l in ["h","a"] for b in config.BOOKS]
+    games_raw_odds = games_data.loc[:,key_cols + h_rawio_cols + a_rawio_cols]
+    games_raw_odds = games_raw_odds.set_index(key_cols)
+    games_raw_odds.columns = pd.MultiIndex.from_tuples(
+        [("h", b) for b in config.BOOKS] + [("a", b) for b in config.BOOKS]
+    )
+    def create_stack_df(games_raw_odds, leg): 
+        games_raw_odds = games_raw_odds[leg]
+        games_raw_odds.columns.name = f"book{leg}"
+        games_raw_odds = games_raw_odds.stack()
+        games_raw_odds.name = f"{leg}_rawio"
+        games_raw_odds = games_raw_odds.reset_index().set_index(key_cols)
+        return games_raw_odds
+    stackh = create_stack_df(games_raw_odds, "h")
+    stacka = create_stack_df(games_raw_odds, "a")
+    combos = pd.merge(
+        stackh,
+        stacka,
+        how="outer",
+        left_index=True,
+        right_index=True
+    ).reset_index()
+    combos["arb_sig"] = (~combos.h_rawio.isnull())&(~combos.a_rawio.isnull())&(combos.h_rawio+combos.a_rawio<1.0)
+    arbs = combos.loc[combos.arb_sig]
+    arbs = arbs.assign(booka_cost=100)
+    arbs["bookh_cost"] = (arbs["h_rawio"]/arbs["a_rawio"]) * arbs["booka_cost"] 
+    arbs["booka_netpayout"] = ((1-arbs["a_rawio"])/arbs["a_rawio"]) * arbs["booka_cost"] - arbs["bookh_cost"]
+    arbs["bookh_netpayout"] = arbs["booka_netpayout"]
+    arbs["return"] = (1/(arbs["h_rawio"]+arbs["a_rawio"])) - 1
+    arb_cols = ["booka_cost", "bookh_cost", "booka_netpayout", "bookh_netpayout", "return"]
+    arb_data = pd.merge(
+        pd.merge(
+            combos,arbs[arb_cols],
+            how="left",
+            left_index=True, right_index=True
+        ),
+        games_data.loc[:,key_cols + odds_cols].set_index(key_cols),
+        how="left",
+        on=key_cols
+    )
+    return arb_data
+
+
 def add_live_stats_cols(games_data):
     score_board_inst = scoreboard.ScoreBoard()
     score_boards = score_board_inst.get_dict()
@@ -207,14 +254,14 @@ def make_return_stats(fsnapsdata_byarb, group_by=["date","game_part"]):
     # agg by game_part
     fsnapsdata_byarb["returnxdur"] = fsnapsdata_byarb["arb_return"] * fsnapsdata_byarb["duration_in_min"]
     fsnapsdata_byarb_agg = \
-            fsnapsdata_byarb.groupby(group_by)\
-                .agg(
-                    n_samples=('arb_return', len),
-                    avg_return=('arb_return', lambda x: x.sum()/len(x)),
-                    sum_returnxdur=('returnxdur', sum),
-                    sum_dur=('duration_in_min', sum),
-                    avg_dur=('duration_in_min', lambda x: x.sum()/len(x))
-            )
+        fsnapsdata_byarb.groupby(group_by)\
+            .agg(
+                n_samples=('arb_return', len),
+                avg_return=('arb_return', lambda x: x.sum()/len(x)),
+                sum_returnxdur=('returnxdur', sum),
+                sum_dur=('duration_in_min', sum),
+                avg_dur=('duration_in_min', lambda x: x.sum()/len(x))
+        )
     fsnapsdata_byarb_agg["wavg_return"] = fsnapsdata_byarb_agg["sum_returnxdur"] / fsnapsdata_byarb_agg["sum_dur"]
     fsnapsdata_byarb_agg = fsnapsdata_byarb_agg.sort_values(["wavg_return"], ascending=False)
     return fsnapsdata_byarb_agg
@@ -236,7 +283,7 @@ if __name__ == '__main__':
         loaded_data = load_current_data()
         games_data = make_games_data(loaded_data)
         games_data = add_calc_cols(games_data)
-        games_data = add_arb_cols(games_data)
+        games_data = make_arb_data(games_data)
         games_data = add_live_stats_cols(games_data)
         save_df_snapshot(games_data)
         if args.email: 
@@ -255,7 +302,7 @@ if __name__ == '__main__':
         loaded_data = load_hist_data() + load_current_data()
         games_data = make_games_data(loaded_data)
         games_data = add_calc_cols(games_data)
-        games_data = add_arb_cols(games_data)
+        games_data = make_arb_data(games_data)
         games_data = add_live_stats_cols(games_data)
         if args.email:
             utils.send_email(
