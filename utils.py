@@ -87,7 +87,7 @@ def select_cols(games_data):
 def filter_games_data(games_data): 
     # filter dataframe in email body
     games_data = games_data\
-        .loc[games_data.arb_sig]\
+        .loc[~games_data.arb_sig.isnull() & games_data.arb_sig]\
         .loc[games_data.date > datetime.datetime.today()-datetime.timedelta(days=30)]\
         .sort_values("date",ascending=False)
     return games_data
@@ -98,7 +98,7 @@ def filter_snaps_data(snaps_data):
     # filter out unusable bookies like PB.
     games_data = snaps_data
     fsnaps_data = games_data\
-        .loc[games_data.arb_sig]\
+        .loc[~games_data.arb_sig.isnull() & games_data.arb_sig]\
         .loc[(games_data.game_part.map(config.game_part_order) > games_data.period_adj)]\
         .loc[games_data.status != 3]\
         .loc[~(
