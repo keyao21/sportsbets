@@ -76,10 +76,6 @@ def calc_cost(row, col):
     return 100
 
 
-def opp_leg(leg): 
-    return "h" if leg=="a" else "a"
-
-
 def calc_rawimplprob(row, col):
     payout = calc_payout(row, col)
     cost = calc_cost(row, col)
@@ -96,46 +92,6 @@ def add_calc_cols(games_data):
         games_data[book+"_vig"] = games_data[book+"_rawiosum"] - 1
         for leg in ["h","a"]:
             games_data[book+leg+"_io"] = games_data[book+leg+"_rawio"] - games_data[book+"_vig"]/2
-    return games_data
-
-
-def add_arb_cols(games_data):
-
-    def calc_impl_cost(row, leg):
-        if row["arb_sig"]: 
-            ba = row["booka"]
-            bh = row["bookh"]
-            raw_prob_a = row[f"{ba}a_rawio"]
-            raw_prob_h = row[f"{bh}h_rawio"]
-            return (raw_prob_h/raw_prob_a)*row[f"book{opp_leg(leg)}_cost"]
-
-    def calc_impl_netpayout(row, leg):
-        # subtracts costs
-        if row["arb_sig"]: 
-            b = row[f"book{leg}"]
-            raw_prob = row[f"{b}{leg}_rawio"]
-            ratio = (1-raw_prob) / raw_prob
-            return ratio*row[f"book{leg}_cost"] - row[f"book{opp_leg(leg)}_cost"] 
-
-    # add arb signal columns
-    h_rawio_cols = [f"{b}h_rawio" for b in config.BOOKS]
-    a_rawio_cols = [f"{b}a_rawio" for b in config.BOOKS]
-    
-    def arb_sig(row): 
-        if not (row[h_rawio_cols].isnull().all() or row[a_rawio_cols].isnull().all()) :
-            return np.nanmin(row[h_rawio_cols])+np.nanmin(row[a_rawio_cols]) < 1
-        return False
-
-    games_data["arb_sig"] = games_data.apply(arb_sig, axis=1)
-    games_data["booka"] = games_data.apply(lambda r: None if not r["arb_sig"] else config.BOOKS[np.nanargmin(r[a_rawio_cols])], axis=1)
-    games_data["bookh"] = games_data.apply(lambda r: None if not r["arb_sig"] else config.BOOKS[np.nanargmin(r[h_rawio_cols])], axis=1)
-    games_data["booka_cost"] = games_data["arb_sig"].apply(lambda x: 100 if x else 0)
-    games_data["bookh_cost"] = games_data.apply(lambda r: calc_impl_cost(r, leg="h"), axis=1)
-    games_data["booka_netpayout"] = games_data.apply(lambda r: calc_impl_netpayout(r,leg="a"), axis=1)
-    games_data["bookh_netpayout"] = games_data.apply(lambda r: calc_impl_netpayout(r,leg="h"), axis=1)
-    games_data["a_rawio"] = games_data.apply(lambda r: r[f"{r['booka']}a_rawio"] if r["arb_sig"] else None, axis=1)
-    games_data["h_rawio"] = games_data.apply(lambda r: r[f"{r['bookh']}h_rawio"] if r["arb_sig"] else None, axis=1)
-    games_data["return"] = games_data["booka_netpayout"] / (games_data["bookh_cost"] + games_data["booka_cost"])
     return games_data
 
 
