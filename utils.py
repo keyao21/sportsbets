@@ -80,7 +80,7 @@ def select_cols(games_data):
          + [f"book{l}{calcstr}" for calcstr in ["", "_cost"] for l in ["h","a"]]
          + ["return", "h_rawio", "a_rawio"]
          + [f"book{l}_netpayout" for l in ["h","a"]]
-         + [b+l for l in ["h","a"] for b in config.BOOKS]
+         #+ [b+l for l in ["h","a"] for b in config.BOOKS]
         ]
 
 
@@ -101,11 +101,7 @@ def filter_snaps_data(snaps_data):
         .loc[~games_data.arb_sig.isnull() & games_data.arb_sig]\
         .loc[(games_data.game_part.map(config.game_part_order) > games_data.period_adj)]\
         .loc[games_data.status != 3]\
-        .loc[~(
-            ((games_data.bookh.str.match("PB")) | (games_data.booka.str.match("PB"))) 
-            & ~games_data.game_part.str.match("FULL")
-            )
-        ]\
+        .loc[~(((games_data.bookh.str.match("PB")) | (games_data.booka.str.match("PB"))) & ~games_data.game_part.str.match("FULL"))]\
         .loc[
         # crazy stuff for excluding DK interquarter stuff when you cant bet.
         # if the game has started, DK is a book, and the current quarter/half is not in the betting quarter half
@@ -139,15 +135,47 @@ def send_email(games_data, incl_hist):
     # show current opps 
     today_games_data = games_data.loc[games_data.date>=today_dt_time]
     curropps_games_data = filter_snaps_data(today_games_data)
+
+    # show time at top of email body
+    msg.attach(MIMEText(f"""<html><body>Timestamp:{curropps_games_data["timestamp"].unique()}</body></html>""", 'html'))
+
+    # predefine dataframe row filters
+    non_started_filter = (curropps_games_data.status.isnull() | curropps_games_data.status.isin([0,1]))
+    full_game_filter = (curropps_games_data.game_part=="FULL")
+
+    # show full game bets first 
+    html = f"""\
+            <html>
+              <head>
+                Games not started
+              </head>
+              <body>
+                {build_table(
+                    select_cols(
+                        curropps_games_data.loc[non_started_filter]
+                        .sort_values(by=["return", "arb_sig", "date", "home", "away", "game_part"],ascending=False)
+                    ),
+                    "blue_light"
+                    ) if len(curropps_games_data) > 0 else "No current arbs"
+                }
+              </body>
+            </html>
+            """
+    part = MIMEText(html, 'html')
+    msg.attach(part)
+
+    # show full game bets first 
     html0 = f"""\
             <html>
               <head>
-                Timestamp:{curropps_games_data["timestamp"].unique()}
+                Full games
               </head>
               <body>
                 {build_table(
                     select_cols(
                         curropps_games_data
+                            .loc[~non_started_filter]
+                            .loc[full_game_filter]
                         .sort_values(by=["return", "arb_sig", "date", "home", "away", "game_part"],ascending=False)
                     ),
                     "blue_light"
@@ -158,6 +186,29 @@ def send_email(games_data, incl_hist):
             """
     part0 = MIMEText(html0, 'html')
     msg.attach(part0)
+
+    # show every other bets 
+    html1 = f"""\
+            <html>
+              <head>
+                Non-Full games
+              </head>
+              <body>
+                {build_table(
+                    select_cols(
+                        curropps_games_data
+                            .loc[~non_started_filter]
+                            .loc[~full_game_filter]
+                        .sort_values(by=["period_adj"],ascending=False)
+                    ),
+                    "blue_light"
+                    ) if len(curropps_games_data) > 0 else "No current arbs"
+                }
+              </body>
+            </html>
+            """
+    part1 = MIMEText(html1, 'html')
+    msg.attach(part1)
 
     # show next/upcoming bets 
     today_games_data_select = today_games_data\
