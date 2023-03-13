@@ -132,18 +132,29 @@ def send_email(games_data, incl_hist):
     msg['From'] = 'helloitsmrbets@gmail.com'
     today_dt = datetime.date.today()
     today_dt_time = datetime.datetime(year=today_dt.year, month=today_dt.month, day=today_dt.day)
+
     # show current opps 
     today_games_data = games_data.loc[games_data.date>=today_dt_time]
     curropps_games_data = filter_snaps_data(today_games_data)
+    curr_ts = None if curropps_games_data.empty else curropps_games_data["timestamp"].unique()[0]
 
     # show time at top of email body
-    msg.attach(MIMEText(f"""<html><body>Timestamp:{curropps_games_data["timestamp"].unique()}</body></html>""", 'html'))
+    msg.attach(MIMEText(f"""<html><body>Timestamp:{curr_ts}</body></html>""", 'html'))
 
     # predefine dataframe row filters
     non_started_filter = (curropps_games_data.status.isnull() | curropps_games_data.status.isin([0,1]))
     full_game_filter = (curropps_games_data.game_part=="FULL")
 
-    # show full game bets first 
+    # filtered games 
+    games_not_started = curropps_games_data.loc[non_started_filter]
+    games_full = curropps_games_data\
+        .loc[~non_started_filter]\
+        .loc[full_game_filter]
+    games_other = curropps_games_data\
+        .loc[~non_started_filter]\
+        .loc[~full_game_filter]
+
+    # show not started game bets first 
     html = f"""\
             <html>
               <head>
@@ -152,11 +163,11 @@ def send_email(games_data, incl_hist):
               <body>
                 {build_table(
                     select_cols(
-                        curropps_games_data.loc[non_started_filter]
+                        games_not_started
                         .sort_values(by=["return", "arb_sig", "date", "home", "away", "game_part"],ascending=False)
                     ),
                     "blue_light"
-                    ) if len(curropps_games_data) > 0 else "No current arbs"
+                    ) if len(games_not_started) > 0 else "No current arbs"
                 }
               </body>
             </html>
@@ -164,7 +175,7 @@ def send_email(games_data, incl_hist):
     part = MIMEText(html, 'html')
     msg.attach(part)
 
-    # show full game bets first 
+    # show full game bets 
     html0 = f"""\
             <html>
               <head>
@@ -173,13 +184,11 @@ def send_email(games_data, incl_hist):
               <body>
                 {build_table(
                     select_cols(
-                        curropps_games_data
-                            .loc[~non_started_filter]
-                            .loc[full_game_filter]
+                        games_full
                         .sort_values(by=["return", "arb_sig", "date", "home", "away", "game_part"],ascending=False)
                     ),
                     "blue_light"
-                    ) if len(curropps_games_data) > 0 else "No current arbs"
+                    ) if len(games_full) > 0 else "No current arbs"
                 }
               </body>
             </html>
@@ -187,7 +196,7 @@ def send_email(games_data, incl_hist):
     part0 = MIMEText(html0, 'html')
     msg.attach(part0)
 
-    # show every other bets 
+    # show every other bet
     html1 = f"""\
             <html>
               <head>
@@ -196,13 +205,11 @@ def send_email(games_data, incl_hist):
               <body>
                 {build_table(
                     select_cols(
-                        curropps_games_data
-                            .loc[~non_started_filter]
-                            .loc[~full_game_filter]
+                        games_other
                         .sort_values(by=["period_adj"],ascending=False)
                     ),
                     "blue_light"
-                    ) if len(curropps_games_data) > 0 else "No current arbs"
+                    ) if len(games_other) > 0 else "No current arbs"
                 }
               </body>
             </html>
@@ -248,7 +255,13 @@ def send_email(games_data, incl_hist):
     msg.attach(end_html)
 
     # write subject 
-    msg['Subject'] = f"{len(curropps_games_data)} arbs right now"
+    msg['Subject'] = f"""\
+        {len(curropps_games_data)} arbs: 
+        {len(games_not_started)} not started, 
+        {len(games_full)} full, 
+        {len(games_other)} other -- 
+        ts:{curr_ts}
+        """
 
     try:
         """Checking for connection errors"""
