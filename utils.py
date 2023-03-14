@@ -125,6 +125,27 @@ def add_attachment(msg, games_data, filename):
     return msg
 
 
+def create_text_part(header, table, sort_cols, ascending=False): 
+    html = f"""\
+            <html>
+              <head>
+                {header}
+              </head>
+              <body>
+                {build_table(
+                    select_cols(
+                        table
+                        .sort_values(by=sort_cols,ascending=ascending)
+                    ),
+                    "blue_light"
+                    ) if len(table) > 0 else "No current arbs"
+                }
+              </body>
+            </html>
+            """
+    return MIMEText(html, 'html')
+
+
 def send_email(games_data, incl_hist):
     recipients = ["kyao747@gmail.com", "sivaduil@gmail.com"] 
     emaillist = [elem.strip().split(',') for elem in recipients]
@@ -154,101 +175,54 @@ def send_email(games_data, incl_hist):
         .loc[~non_started_filter]\
         .loc[~full_game_filter]
 
-    # show not started game bets first 
-    html = f"""\
-            <html>
-              <head>
-                Games not started
-              </head>
-              <body>
-                {build_table(
-                    select_cols(
-                        games_not_started
-                        .sort_values(by=["return", "arb_sig", "date", "home", "away", "game_part"],ascending=False)
-                    ),
-                    "blue_light"
-                    ) if len(games_not_started) > 0 else "No current arbs"
-                }
-              </body>
-            </html>
-            """
-    part = MIMEText(html, 'html')
-    msg.attach(part)
-
-    # show full game bets 
-    html0 = f"""\
-            <html>
-              <head>
-                Full games
-              </head>
-              <body>
-                {build_table(
-                    select_cols(
-                        games_full
-                        .sort_values(by=["return", "arb_sig", "date", "home", "away", "game_part"],ascending=False)
-                    ),
-                    "blue_light"
-                    ) if len(games_full) > 0 else "No current arbs"
-                }
-              </body>
-            </html>
-            """
-    part0 = MIMEText(html0, 'html')
-    msg.attach(part0)
-
+    # show not started game bets first
+    msg.attach(
+        create_text_part(
+            header="Games not started",
+            table=games_not_started,
+            sort_cols=["return", "arb_sig", "date", "home", "away", "game_part"],
+            ascending=False
+        )
+    )
+    # show full game bets
+    msg.attach(
+        create_text_part(
+            header="Full games",
+            table=games_full,
+            sort_cols=["return", "arb_sig", "date", "home", "away", "game_part"],
+            ascending=False
+        )
+    )
     # show every other bet
-    html1 = f"""\
-            <html>
-              <head>
-                Non-Full games
-              </head>
-              <body>
-                {build_table(
-                    select_cols(
-                        games_other
-                        .sort_values(by=["period_adj"],ascending=False)
-                    ),
-                    "blue_light"
-                    ) if len(games_other) > 0 else "No current arbs"
-                }
-              </body>
-            </html>
-            """
-    part1 = MIMEText(html1, 'html')
-    msg.attach(part1)
-
+    msg.attach(
+        create_text_part(
+            header="Non-Full games",
+            table=games_other,
+            sort_cols=["period_adj"],
+            ascending=False
+        )
+    )
     # show next/upcoming bets 
-    today_games_data_select = today_games_data\
-        .sort_values(by=["status", "return", "arb_sig", "date", "home", "away", "game_part"],ascending=False)
-    html1 = f"""\
-            <html>
-              <head>Next/current games</head>
-              <body>
-                {build_table(
-                    select_cols(today_games_data_select),
-                    "blue_light"
-                    ) if len(today_games_data_select) > 0 else "None"
-                }
-              </body>
-            </html>
-            """
-    part1 = MIMEText(html1, 'html')
-    msg.attach(part1)
-    msg = add_attachment(msg, select_cols(today_games_data_select), filename=f"today_{today_dt.strftime('%Y%m%d')}.csv")
+    msg.attach(
+        create_text_part(
+            header="All games",
+            table=today_games_data,
+            sort_cols=["status", "return", "arb_sig", "date", "home", "away", "game_part"],
+            ascending=False
+        )
+    )
+    msg = add_attachment(msg, select_cols(today_games_data), filename=f"today_{today_dt.strftime('%Y%m%d')}.csv")
 
     # show games with signal
     if incl_hist: 
         filt_games_data = select_cols(filter_games_data(games_data))
-        html2 = f"""\
-                <html>
-                  <head>All total prob inconsistencies over past 30 days</head>
-                  <body>
-                    {build_table(filt_games_data,"blue_light")}
-                  </body>
-                </html>
-                """
-        part2 = MIMEText(html2, 'html')
-        msg.attach(part2)
+        msg.attach(
+            create_text_part(
+                header="All total prob inconsistencies over past 30 days",
+                table=filt_games_data,
+                sort_cols=None
+            )
+        )
         msg = add_attachment(msg, filt_games_data, filename=f"hist_{today_dt.strftime('%Y%m%d')}.csv")
 
     end_html = MIMEText("<html><head>End of email goodbye</html></head>", 'html')
@@ -256,11 +230,7 @@ def send_email(games_data, incl_hist):
 
     # write subject 
     msg['Subject'] = f"""\
-        {len(curropps_games_data)} arbs: 
-        {len(games_not_started)} not started, 
-        {len(games_full)} full, 
-        {len(games_other)} other -- 
-        ts:{curr_ts}
+        {len(curropps_games_data)} arbs: {len(games_not_started)} not started, {len(games_full)} full, {len(games_other)} other -- ts:{curr_ts}
         """
 
     try:
