@@ -1,17 +1,16 @@
 # Mr. Bets
 ## Todo
-    - show every arb for each game, not just the one with the max return 
     - other sports, ncaa, mlb
     - pinnacle
 
 ## Runbook
 
 ### Arb Screen
+    - Everyday 12:05am
     - Weekdays
-        - 8am - 7pm, hourly
-        - 7pm - 12am, every 10 min
+        - 1pm - 9pm, every 20 min
     - Weekends
-        - 11am - 12am, every 10 min  
+        - 11am - 11pm, every 20 min  
     - Scrapes for current/next games from odds website
     - Create and save snap dataframe after enrichment
 ### Stats
@@ -40,7 +39,7 @@ loaded_data = load_hist_data() \
             + load_snap_data()
 games_data = make_games_data(loaded_data)
 games_data = add_calc_cols(games_data)
-games_data = add_arb_cols(games_data)
+games_data = make_arb_data(games_data)
 ```
 ## Glossary 
     - *_io: implied probability (with vig adjustment)
