@@ -8,7 +8,7 @@
 ### Arb Screen
     - Everyday 12:05am
     - Weekdays
-        - 1pm - 9pm, every 20 min
+        - 1pm - 10pm, every 20 min
     - Weekends
         - 11am - 11pm, every 20 min  
     - Scrapes for current/next games from odds website
