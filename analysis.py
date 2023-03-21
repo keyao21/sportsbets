@@ -161,7 +161,7 @@ def add_live_stats_cols(games_data):
     )
     # (hacky?) way to adjust end periods and remove end of quarters and finals when theyre no longer valid for the bet
     stats_data_df["period_adj"] = stats_data_df["period"] \
-        + (stats_data_df["statustxt"].str.contains("End|Half", regex=True) | stats_data_df["period"]==3).astype(int)
+        + (stats_data_df["statustxt"].str.contains("End|Half", regex=True) | (stats_data_df["period"]==3)).astype(int)
     today_dt = datetime.date.today()
     today_dt_time = datetime.datetime(year=today_dt.year, month=today_dt.month, day=today_dt.day)
     stats_data_df["date"] = today_dt_time
@@ -271,6 +271,7 @@ if __name__ == '__main__':
         loaded_data = load_snap_data()
         snaps_data = make_snaps_data(loaded_data)
         snaps_data = utils.filter_snaps_data(snaps_data)
+        snaps_data = snaps_data.loc[utils.get_non_started_filter(snaps_data)] # only get non-started games
         fsnapsdata_byarb = make_data_by_uniq_arb(snaps_data)
         fsnapsdata_byarb_agg_dt = make_return_stats(fsnapsdata_byarb, group_by=["date"]).sort_values("date")
         fsnapsdata_byarb_agg_gp = make_return_stats(fsnapsdata_byarb, group_by=["game_part"])

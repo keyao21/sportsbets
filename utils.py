@@ -93,10 +93,9 @@ def filter_games_data(games_data):
     return games_data
 
 
-def filter_snaps_data(snaps_data): 
+def filter_snaps_data(games_data): 
     # get only usable return periods
     # filter out unusable bookies like PB.
-    games_data = snaps_data
     fsnaps_data = games_data\
         .loc[~games_data.arb_sig.isnull() & games_data.arb_sig]\
         .loc[(games_data.game_part.map(config.game_part_order) > games_data.period_adj)]\
@@ -112,6 +111,14 @@ def filter_snaps_data(snaps_data):
           )
         ]
     return fsnaps_data
+
+
+def get_non_started_filter(games_data): 
+    return (games_data.status.isnull() | games_data.status.isin([0,1]))
+
+
+def get_full_game_filter(games_data): 
+    return (games_data.game_part=="FULL")
 
 
 def add_attachment(msg, games_data, filename): 
@@ -163,8 +170,8 @@ def send_email(games_data, incl_hist):
     msg.attach(MIMEText(f"""<html><body>Timestamp:{curr_ts}</body></html>""", 'html'))
 
     # predefine dataframe row filters
-    non_started_filter = (curropps_games_data.status.isnull() | curropps_games_data.status.isin([0,1]))
-    full_game_filter = (curropps_games_data.game_part=="FULL")
+    non_started_filter = get_non_started_filter(curropps_games_data)
+    full_game_filter = get_full_game_filter(curropps_games_data)
 
     # filtered games 
     games_not_started = curropps_games_data.loc[non_started_filter]
