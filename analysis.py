@@ -1,67 +1,9 @@
-import os 
-import itertools
-import functools
-import pickle
-import argparse
 import datetime
 import numpy as np
 import pandas as pd
-from nba_api.live.nba.endpoints import scoreboard
-import odd_scraper
 import config
 import utils
-
-
-def load_hist_data(): 
-    # get historical data
-    data = [
-        pickle.load(open(os.path.join(config.HIST_DIR,f), "rb")) 
-        for f in os.listdir(config.HIST_DIR)
-    ]
-    return data
-
-
-def load_snap_data(): 
-    # get snap daily data
-    data = [
-        pickle.load(open(os.path.join(config.SNAPS_DIR,f), "rb")) 
-        for f in os.listdir(config.SNAPS_DIR)
-    ]
-    return data
-
-
-def load_current_data(): 
-    # get data for next games
-    data = [
-        odd_scraper.run_current(gp) 
-        for gp in config.GamePart
-    ]
-    return data
-
-
-def make_games_data(data):
-    col_headers = \
-        ["timestamp", "date", "game_part", "home", "away", "SCOREh", "SCOREa"] + \
-        list(itertools.chain(*[[b+"h", b+"a"] for b in config.BOOKS]))
-    all_rows = []
-    for data_i in data:
-        n_games = len(data_i["teams"])
-        rows = [
-            [data_i["timestamp"], data_i["date"], data_i["game_part"]] 
-            for _ in range(n_games)
-        ]
-        for j in range(n_games):
-            short_teams = [
-                t if t not in utils.SBR_TEAMS else utils.SBR_TEAMS[t] 
-                for t in data_i["teams"][j]
-            ]
-            rows[j].extend(short_teams)
-            rows[j].extend(data_i["score"][j])
-            for b in config.BOOKS: 
-                rows[j].extend(data_i["odds_by_book"][j][b])
-        all_rows.extend(rows)
-    games_data = pd.DataFrame(all_rows, columns=col_headers)
-    return games_data
+from nba_api.live.nba.endpoints import scoreboard
 
 
 def calc_payout(row, col): 
@@ -112,11 +54,9 @@ def make_arb_data(games_data):
         games_raw_odds.name = f"{leg}_rawio"
         games_raw_odds = games_raw_odds.reset_index().set_index(key_cols)
         return games_raw_odds
-    stackh = create_stack_df(games_raw_odds, "h")
-    stacka = create_stack_df(games_raw_odds, "a")
     combos = pd.merge(
-        stackh,
-        stacka,
+        create_stack_df(games_raw_odds, "h"),
+        create_stack_df(games_raw_odds, "a"),
         how="outer",
         left_index=True,
         right_index=True
@@ -175,21 +115,6 @@ def add_live_stats_cols(games_data):
     return games_data
 
 
-def save_df_snapshot(df):
-    ts = datetime.datetime.now()
-    filename = f"snap_{ts.strftime('%Y%m%d%H%M%S')}.dat"
-    with open(os.path.join(config.SNAPS_DIR, filename), "wb") as f:
-        df['timestamp'] = ts
-        pickle.dump(df, f)
-
-
-def make_snaps_data(data): 
-    return functools.reduce(
-        lambda d1,d2: pd.concat([d1,d2], ignore_index=True), 
-        data
-    )
-
-
 def make_data_by_uniq_arb(snaps_data): 
     # agg by unique bet arbs
     snaps_data["return_dummy"] = snaps_data["return"]
@@ -221,69 +146,3 @@ def make_return_stats(fsnapsdata_byarb, group_by=["date","game_part"]):
     fsnapsdata_byarb_agg["wavg_return"] = fsnapsdata_byarb_agg["sum_returnxdur"] / fsnapsdata_byarb_agg["sum_dur"]
     fsnapsdata_byarb_agg = fsnapsdata_byarb_agg.sort_values(["wavg_return"], ascending=False)
     return fsnapsdata_byarb_agg
-
-
-if __name__ == '__main__':
-    run_dt = datetime.date.today()
-    parser = argparse.ArgumentParser()
-    group = parser.add_mutually_exclusive_group()
-    group.add_argument('--simple', action='store_true')
-    group.add_argument('--hist', action='store_true')
-    group.add_argument('--stats', action='store_true')
-    parser.add_argument('--email', action='store_true')
-    parser.add_argument('--check_email', action='store_true')
-    args = parser.parse_args()
-
-    if args.simple:
-        # general run for current/next games.
-        loaded_data = load_current_data()
-        games_data = make_games_data(loaded_data)
-        games_data = add_calc_cols(games_data)
-        games_data = make_arb_data(games_data)
-        games_data = add_live_stats_cols(games_data)
-        save_df_snapshot(games_data)
-        if args.email: 
-            utils.send_email(
-                games_data,
-                incl_hist=False
-            )
-        elif args.check_email and (len(games_data[games_data.arb_sig])>0): 
-            utils.send_email(
-                games_data,
-                incl_hist=False
-            )
-
-    elif args.hist:
-        # historical run with all past games and current/next games. 
-        loaded_data = load_hist_data() + load_current_data()
-        games_data = make_games_data(loaded_data)
-        games_data = add_calc_cols(games_data)
-        games_data = make_arb_data(games_data)
-        games_data = add_live_stats_cols(games_data)
-        if args.email:
-            utils.send_email(
-                games_data,
-                incl_hist=True
-            )
-
-    elif args.stats: 
-        # run stats
-        loaded_data = load_snap_data()
-        snaps_data = make_snaps_data(loaded_data)
-        snaps_data = utils.filter_snaps_data(snaps_data)
-        snaps_data = snaps_data.loc[utils.get_non_started_filter(snaps_data)] # only get non-started games
-        fsnapsdata_byarb = make_data_by_uniq_arb(snaps_data)
-        fsnapsdata_byarb_agg_dt = make_return_stats(fsnapsdata_byarb, group_by=["date"]).sort_values("date")
-        fsnapsdata_byarb_agg_gp = make_return_stats(fsnapsdata_byarb, group_by=["game_part"])
-        fsnapsdata_byarb_agg_bk = make_return_stats(fsnapsdata_byarb, group_by=["bookh","booka","game_part"])
-        fsnapsdata_byarb_agg = make_return_stats(fsnapsdata_byarb, group_by=["date","game_part"])
-        if args.email:
-            utils.send_stat_email(
-                {
-                    "By date"           : fsnapsdata_byarb_agg_dt,
-                    "By game part"      : fsnapsdata_byarb_agg_gp,
-                    "By date, game part": fsnapsdata_byarb_agg,
-                    "By bookies"        : fsnapsdata_byarb_agg_bk
-                }
-            )
-        

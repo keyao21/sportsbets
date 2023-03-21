@@ -32,14 +32,15 @@ Do something like
 ```python
 import sys 
 sys.path.insert(0, '..')
-from analysis import *
+import utils
+import analysis
 
-loaded_data = load_hist_data() \
-            + load_current_data() \
-            + load_snap_data()
-games_data = make_games_data(loaded_data)
-games_data = add_calc_cols(games_data)
-games_data = make_arb_data(games_data)
+loaded_data = utils.load_hist_data() \
+            + utils.load_current_data() \
+            + utils.load_snap_data()
+games_data = utils.make_games_data(loaded_data)
+games_data = analysis.add_calc_cols(games_data)
+games_data = analysis.make_arb_data(games_data)
 ```
 ## Glossary 
     - *_io: implied probability (with vig adjustment)
