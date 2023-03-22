@@ -235,7 +235,7 @@ if __name__ == '__main__':
 
     elif args.stats: 
         # run stats
-        loaded_data = utils.load_snap_data()[-10:]
+        loaded_data = utils.load_snap_data()
         snaps_data = utils.make_snaps_data(loaded_data)
         snaps_data = utils.filter_snaps_data(snaps_data)
         snaps_data = snaps_data.loc[utils.get_non_started_filter(snaps_data)] # only get non-started games
