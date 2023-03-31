@@ -18,7 +18,7 @@ logging.basicConfig(
 
 def get_soup(str_lookback_date, game_part): 
     date_url_part = f"?date={str_lookback_date}" if str_lookback_date else ""
-    URL = f"https://www.sportsbookreview.com/betting-odds/nba-basketball/money-line/{game_part}/{date_url_part}"
+    URL = f"https://www.sportsbookreview.com/betting-odds/nhl-hockey/money-line/{game_part}/{date_url_part}"
     page = requests.get(URL)
     soup = BeautifulSoup(page.content, "html.parser")
     return soup
@@ -27,7 +27,7 @@ def get_soup(str_lookback_date, game_part):
 def get_tablegames(str_lookback_date, game_part):
     soup = get_soup(str_lookback_date, game_part)
     # get data table
-    tablebody = soup.find(id="tbody-nba")
+    tablebody = soup.find(id="tbody-nhl")
     if tablebody: 
         tablegames_regex = re.compile('GameRows_eventMarketGridContainer__GuplK GameRows_neverWrap__gnQNO GameRows_compact__ZqqNS.*')
         tablegames = tablebody.find_all("div", {"class" : tablegames_regex})
@@ -48,10 +48,12 @@ def parse_results(tb):
 def parse_teams(tb): 
     teams_regex = re.compile('GameRows_participants__Fdd1S.*')
     teams_html = tb.find_all("div", {"class" : teams_regex})
+    # breakpoint()
     teams = [ 
-        t.find("span", class_="GameRows_participantBox__0WCRz").text
+        # t.find("span", class_="GameRows_participantBox__0WCRz").text
+        t.find("a", class_="GameRows_gradientContainer__ZajIf").text.split("\xa0")[0]
         for t in teams_html 
-    ]
+    ][::-1]
     return teams
 
 
@@ -129,13 +131,13 @@ def test():
         datetime.date(2022,12,25),
         datetime.date(2023,2,16)
     ]: 
-        run_and_dump(dt_i, config.GamePart.FULL)
-        run_and_dump(dt_i, config.GamePart.HALF1)
-        run_and_dump(dt_i, config.GamePart.HALF2)
-        run_and_dump(dt_i, config.GamePart.Q1)
-        run_and_dump(dt_i, config.GamePart.Q2)
-        run_and_dump(dt_i, config.GamePart.Q3)
-        run_and_dump(dt_i, config.GamePart.Q4)
+        run_and_dump(dt_i, utils.GamePart.FULL)
+        run_and_dump(dt_i, utils.GamePart.HALF1)
+        run_and_dump(dt_i, utils.GamePart.HALF2)
+        run_and_dump(dt_i, utils.GamePart.Q1)
+        run_and_dump(dt_i, utils.GamePart.Q2)
+        run_and_dump(dt_i, utils.GamePart.Q3)
+        run_and_dump(dt_i, utils.GamePart.Q4)
 
     test = pickle.load(open("20221225.dat", "rb"))
     breakpoint()
@@ -147,10 +149,10 @@ if __name__ == '__main__':
         end=datetime.date(2023,2,16)
     ).to_pydatetime().tolist()
     for dt_i in dt_range:
-        run_and_dump(dt_i, config.GamePart.FULL)
-        run_and_dump(dt_i, config.GamePart.HALF1)
-        run_and_dump(dt_i, config.GamePart.HALF2)
-        run_and_dump(dt_i, config.GamePart.Q1)
-        run_and_dump(dt_i, config.GamePart.Q2)
-        run_and_dump(dt_i, config.GamePart.Q3)
-        run_and_dump(dt_i, config.GamePart.Q4)
+        run_and_dump(dt_i, utils.GamePart.FULL)
+        run_and_dump(dt_i, utils.GamePart.HALF1)
+        run_and_dump(dt_i, utils.GamePart.HALF2)
+        run_and_dump(dt_i, utils.GamePart.Q1)
+        run_and_dump(dt_i, utils.GamePart.Q2)
+        run_and_dump(dt_i, utils.GamePart.Q3)
+        run_and_dump(dt_i, utils.GamePart.Q4)

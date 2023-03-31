@@ -75,6 +75,30 @@ SBR_TEAMS = {
     "Washington": "WAS"
 }
 
+SBR_NHL_TEAMS = {
+    "BOS":"BOS",
+    "CBJ":"CLB",
+    "FLA":"FLA",
+    "MTL":"MON",
+    "OTT":"OTT",
+    "PHI":"PHI",
+    "PIT":"PIT",
+    "NSH":"NAS",
+    "TB":"TB",
+    "WSH":"WAS",
+    "DET":"DET",
+    "CAR":"CAR",
+    "CHI":"CHI",
+    "STL":"STL",
+    "EDM":"EDM",
+    "LA":"LA",
+    "SEA":"SEA",
+    "ANA":"ANA",
+    "SJ":"SJ",
+    "VGK":"VEG"
+}
+
+
 
 class GamePart(str, Enum): 
     FULL = "full-game"
@@ -147,7 +171,8 @@ def make_games_data(data):
         ]
         for j in range(n_games):
             short_teams = [
-                t if t not in SBR_TEAMS else SBR_TEAMS[t] 
+                # t if t not in SBR_TEAMS else SBR_TEAMS[t]
+                t if t not in SBR_NHL_TEAMS else SBR_NHL_TEAMS[t] 
                 for t in data_i["teams"][j]
             ]
             rows[j].extend(short_teams)

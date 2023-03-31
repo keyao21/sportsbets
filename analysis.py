@@ -1,3 +1,5 @@
+import requests
+import json
 import datetime
 import numpy as np
 import pandas as pd
@@ -82,7 +84,7 @@ def make_arb_data(games_data):
     return arb_data
 
 
-def add_live_stats_cols(games_data):
+def deprecated_add_live_stats_cols(games_data):
     score_board_inst = scoreboard.ScoreBoard()
     score_boards = score_board_inst.get_dict()
     stats_data = [
@@ -102,6 +104,49 @@ def add_live_stats_cols(games_data):
     # (hacky?) way to adjust end periods and remove end of quarters and finals when theyre no longer valid for the bet
     stats_data_df["period_adj"] = stats_data_df["period"] \
         + (stats_data_df["statustxt"].str.contains("End|Half", regex=True) | (stats_data_df["period"]==3)).astype(int)
+    today_dt = datetime.date.today()
+    today_dt_time = datetime.datetime(year=today_dt.year, month=today_dt.month, day=today_dt.day)
+    stats_data_df["date"] = today_dt_time
+    games_data = pd.merge(
+        games_data,
+        stats_data_df,
+        on=["home","away","date"],
+        how="left"
+    )
+    games_data["status"] = games_data["status"].fillna(0) # set status default
+    return games_data
+
+
+def add_live_stats_cols(games_data):
+    url = 'http://site.api.espn.com/apis/site/v2/sports/hockey/nhl/scoreboard'
+    r = requests.get(url)
+    data = json.loads(r.text)
+    stats_data = [
+        [
+            event["shortName"].split(" @ ")[1],
+            event["shortName"].split(" @ ")[0],
+            event["status"]["type"]["shortDetail"], # 
+            event["status"]["type"]["name"],
+            event["status"]["type"]["completed"],
+            event["status"]["type"]["description"],
+            event["status"]["period"]
+        ]
+        for event  in data["events"]
+    ]
+    stats_data_df = pd.DataFrame(
+        stats_data,
+        columns=["home","away","shortDetail","name","completed","description","period"]
+        # columns=["home","away","statustxt","status","period"]
+    )
+    stats_data_df["statustxt"] = stats_data_df["shortDetail"]
+    stats_data_df["status"] = stats_data_df["name"].map({
+        "STATUS_FINAL":3,
+        "STATUS_IN_PROGRESS":2,
+        "STATUS_END_PERIOD":2})
+    stats_data_df["period"]
+    # (hacky?) way to adjust end periods and remove end of quarters and finals when theyre no longer valid for the bet
+    stats_data_df["period_adj"] = stats_data_df["period"] \
+        + (stats_data_df["statustxt"].str.contains("End|Final", regex=True)).astype(int)
     today_dt = datetime.date.today()
     today_dt_time = datetime.datetime(year=today_dt.year, month=today_dt.month, day=today_dt.day)
     stats_data_df["date"] = today_dt_time

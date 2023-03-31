@@ -126,7 +126,7 @@ def send_email(games_data, incl_hist):
 
     # write subject 
     msg['Subject'] = f"""\
-        {len(curropps_games_data)} arbs: {len(games_not_started)} not started, {len(games_full)} full, {len(games_other)} other -- ts:{curr_ts}
+        NHL(dev) {len(curropps_games_data)} arbs: {len(games_not_started)} not started, {len(games_full)} full, {len(games_other)} other -- ts:{curr_ts}
         """
 
     try:
