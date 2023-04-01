@@ -142,7 +142,9 @@ def add_live_stats_cols(games_data):
     stats_data_df["status"] = stats_data_df["name"].map({
         "STATUS_FINAL":3,
         "STATUS_IN_PROGRESS":2,
-        "STATUS_END_PERIOD":2})
+        "STATUS_END_PERIOD":2,
+        "STATUS_SCHEDULED":1
+    })
     stats_data_df["period"]
     # (hacky?) way to adjust end periods and remove end of quarters and finals when theyre no longer valid for the bet
     stats_data_df["period_adj"] = stats_data_df["period"] \
